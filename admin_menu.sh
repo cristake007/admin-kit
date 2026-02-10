@@ -98,6 +98,7 @@ databases_screen() {
     echo_note "1) Install MariaDB"
     echo_note "2) Install MySQL"
     echo_note "3) Install PostgreSQL"
+    echo_note "4) Database/User quick setup (dodb.sh)"
     echo_note ""
     echo_note "0) Return to Main Menu"
     echo -ne "\n${YELLOW}Enter your choice:${NC} "
@@ -116,6 +117,10 @@ databases_screen() {
         clear
         display_header "Install PostgreSQL"
         run "$SCRIPT_DIR/scripts/databases/install_postgresql.sh" || echo_error "PostgreSQL install failed."; pause ;;
+      4)
+        clear
+        display_header "Database/User quick setup"
+        run "$SCRIPT_DIR/dodb.sh" || echo_error "Database quick setup failed."; pause ;;
       0) return ;;
       *) echo_error "Invalid option. Please try again."; pause ;;
     esac
