@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Metadata:
+# Requires: mysql or mariadb or postgresql client binaries
+# Privileges: root or sudo
+# Target distro: Debian/Ubuntu
+# Side effects: creates databases/users and grants privileges
+# Safe to re-run: mostly yes (idempotent create-if-not-exists logic)
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,6 +18,12 @@ need_sudo || exit 1
 validate_db_identifier() {
   local value="$1"
   [[ "$value" =~ ^[A-Za-z0-9_]+$ ]]
+}
+
+escape_sql_literal() {
+  local value="$1"
+  # SQL single-quoted literal escape: ' -> ''
+  printf '%s' "${value//\'/\'\'}"
 }
 
 read_password_twice() {
@@ -42,20 +54,24 @@ mysql_like_create_db_user() {
   local db_name="$2"
   local db_user="$3"
   local db_pass="$4"
+  local db_pass_escaped
 
-  local sql
-  sql=$(cat <<SQL
+  db_pass_escaped="$(escape_sql_literal "$db_pass")"
+
+  if [[ "$engine" == "mysql" ]]; then
+    sudo mysql <<SQL
 CREATE DATABASE IF NOT EXISTS \`${db_name}\`;
-CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
+CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass_escaped}';
 GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';
 FLUSH PRIVILEGES;
 SQL
-)
-
-  if [[ "$engine" == "mysql" ]]; then
-    sudo mysql -e "$sql"
   else
-    sudo mariadb -e "$sql"
+    sudo mariadb <<SQL
+CREATE DATABASE IF NOT EXISTS \`${db_name}\`;
+CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass_escaped}';
+GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';
+FLUSH PRIVILEGES;
+SQL
   fi
 }
 
@@ -63,12 +79,15 @@ postgres_create_db_user() {
   local db_name="$1"
   local db_user="$2"
   local db_pass="$3"
+  local db_pass_escaped
+
+  db_pass_escaped="$(escape_sql_literal "$db_pass")"
 
   sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
 DO \$\$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${db_user}') THEN
-    CREATE ROLE "${db_user}" LOGIN PASSWORD '${db_pass}';
+    CREATE ROLE "${db_user}" LOGIN PASSWORD '${db_pass_escaped}';
   END IF;
 END
 \$\$;
@@ -140,6 +159,7 @@ main() {
       ;;
   esac
 
+  unset DB_PASS
   echo_success "Done. Database and user are ready."
 }
 

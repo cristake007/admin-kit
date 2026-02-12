@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Metadata:
+# Requires: apt, optional extrepo for non-default versions
+# Privileges: root or sudo
+# Target distro: Debian/Ubuntu
+# Side effects: installs PHP packages and may change active php alternative
+# Safe to re-run: yes
 set -euo pipefail
 
 # Self-bootstrap (works no matter where you run it from)
