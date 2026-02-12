@@ -152,6 +152,7 @@ err_trap() {
 # yes/no prompt
 confirm() {
     read -r -p "${1:-Proceed?} (Y/n): " ans
+    echo
     [[ -z "$ans" || "$ans" =~ ^[Yy]$ ]]
 }
 
@@ -160,6 +161,7 @@ confirm_skip() {
   local ans
   while true; do
     read -r -p "${prompt} (y=yes / n=no / s=skip): " ans
+    echo
     case "$ans" in
       [Yy]) return 0 ;;
       [Nn]) return 1 ;;

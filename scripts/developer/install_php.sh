@@ -15,6 +15,10 @@ require "functions/functions.sh"
 
 need_sudo || exit 1
 
+has_extrepo() {
+  apt_is_installed extrepo || command_exists extrepo
+}
+
 install_php_packages() {
   local version="$1"
   local with_extensions="$2"
@@ -52,7 +56,7 @@ main() {
   local versions=("$default_ver")
 
   # If extrepo is installed, add other versions
-  if command_exists extrepo; then
+  if has_extrepo; then
     # Common versions from Sury repo (Debian + extrepo)
     versions+=("7.4" "8.1" "8.3" "8.4")
   fi
@@ -120,7 +124,7 @@ main() {
     echo_note "Installing: ${packages[*]}"
     apt_install "${packages[@]}"
   else
-    if ! command_exists extrepo; then
+    if ! has_extrepo; then
       echo_error "extrepo is not installed. Run the 'Install Extrepo' menu option first."
       return 1
     fi

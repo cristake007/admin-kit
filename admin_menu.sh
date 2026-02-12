@@ -17,9 +17,9 @@ require "functions/functions.sh"
 installed_label() {
   local package="$1"
   if apt_is_installed "$package"; then
-    printf '[installed]'
+    printf "${GREEN}[installed]${NC}"
   else
-    printf '[not installed]'
+    printf "${RED}[not installed]${NC}"
   fi
 }
 
@@ -213,7 +213,7 @@ developer_screen(){
   while true; do
     clear
     display_header "Developer tools"
-    echo_note "1) Install Extrepo (external apt repositories)"
+    echo_note "1) Install Extrepo (external apt repositories) $(installed_label extrepo)"
     echo_note "2) Install PHP and common extensions $(installed_label php)"
     echo_note "3) Install Composer $(installed_label composer)"
     echo_note "4) Install Node.js and npm $(installed_label node)"
