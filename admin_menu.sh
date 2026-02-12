@@ -187,11 +187,11 @@ security_screen() {
 }
 
 backups_screen(){
-  echo_error "Backup functionality is under development."
   while true; do
     clear
     display_header "Backups"
     echo_note "1) Backup script --in development"
+    echo_info "Backup functionality is under development."
     echo_note "0) Return to Main Menu"
     echo_note ""
     echo -ne "\n${YELLOW}Enter your choice:${NC} "
