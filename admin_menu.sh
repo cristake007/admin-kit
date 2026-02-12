@@ -61,7 +61,7 @@ system_screen() {
       3)
         clear
         display_header "Set timezone"
-        run "$SCRIPT_DIR/scripts/system/set_timezone.sh" || echo_error "Setting timzone failed."; pause;;
+        run "$SCRIPT_DIR/scripts/system/set_timezone.sh" || echo_error "Setting timezone failed."; pause;;
       4)
         clear
         display_header "Set hostname"
@@ -96,7 +96,7 @@ webserver_screen() {
       1)
         clear
         display_header "Install Apache2"
-        run "$SCRIPT_DIR/scripts/webserver/apache2.sh" || echo_error "Apache2 setup failed failed."; pause ;;
+        run "$SCRIPT_DIR/scripts/webserver/apache2.sh" || echo_error "Apache2 setup failed."; pause ;;
       2)
         clear
         display_header "Install Nginx"
@@ -132,7 +132,7 @@ databases_screen() {
       1)
         clear
         display_header "Install MariaDB"
-        run "$SCRIPT_DIR/scripts/databases/install_mariadb.sh" || echo_error "MariaDB setup failed failed."; pause ;;
+        run "$SCRIPT_DIR/scripts/databases/install_mariadb.sh" || echo_error "MariaDB setup failed."; pause ;;
       2)
         clear
         display_header "Install MySQL"
