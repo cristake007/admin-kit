@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Metadata:
+# Requires: bash, coreutils
+# Privileges: mixed (delegates to child scripts)
+# Target distro: Debian/Ubuntu
+# Side effects: orchestrates execution of installation/config scripts
+# Safe to re-run: yes (depends on selected action)
 set -Eeuo pipefail
 trap err_trap ERR
 
@@ -7,6 +13,24 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/scripts/bootstrap.sh"
 require "functions/functions.sh"
+
+installed_label() {
+  local package="$1"
+  if apt_is_installed "$package"; then
+    printf '[installed]'
+  else
+    printf '[not installed]'
+  fi
+}
+
+service_label() {
+  local service="$1"
+  if service_is_active "$service"; then
+    printf '[running]'
+  else
+    printf '[stopped]'
+  fi
+}
 
 ###################
 #      SYSTEM     #
@@ -60,9 +84,9 @@ webserver_screen() {
   while true; do
     clear
     display_header "Webserver"
-    echo_note "1) Install Apache2"
-    echo_note "2) Install Nginx"
-    echo_note "3) Install Certbot (Let's Encrypt)"
+    echo_note "1) Install Apache2 $(installed_label apache2) $(service_label apache2)"
+    echo_note "2) Install Nginx $(installed_label nginx) $(service_label nginx)"
+    echo_note "3) Install Certbot (Let's Encrypt) $(installed_label certbot)"
     echo_note ""
     echo_note "0) Return to Main Menu"
     echo -ne "\n${YELLOW}Enter your choice:${NC} "
@@ -95,9 +119,9 @@ databases_screen() {
   while true; do
     clear
     display_header "Databases"
-    echo_note "1) Install MariaDB"
-    echo_note "2) Install MySQL"
-    echo_note "3) Install PostgreSQL"
+    echo_note "1) Install MariaDB $(installed_label mariadb-server) $(service_label mariadb)"
+    echo_note "2) Install MySQL $(installed_label mysql-server) $(service_label mysql)"
+    echo_note "3) Install PostgreSQL $(installed_label postgresql) $(service_label postgresql)"
     echo_note "4) Database/User quick setup (dodb.sh)"
     echo_note ""
     echo_note "0) Return to Main Menu"
@@ -136,8 +160,8 @@ security_screen() {
     clear
     display_header "Security"
     echo_note "1) Disable root SSH login"
-    echo_note "2) Install fail2ban"
-    echo_note "2) Install UFW"
+    echo_note "2) Install fail2ban $(installed_label fail2ban)"
+    echo_note "3) Install UFW $(installed_label ufw)"
     echo_note ""
     echo_note "0) Return to Main Menu"
     echo -ne "\n${YELLOW}Enter your choice:${NC} "
@@ -190,10 +214,10 @@ developer_screen(){
     clear
     display_header "Developer tools"
     echo_note "1) Install Extrepo (external apt repositories)"
-    echo_note "2) Install PHP and common extensions"
-    echo_note "3) Install Composer"
-    echo_note "4) Install Node.js and npm"
-    echo_note "5) Install Symfony-CLI"
+    echo_note "2) Install PHP and common extensions $(installed_label php)"
+    echo_note "3) Install Composer $(installed_label composer)"
+    echo_note "4) Install Node.js and npm $(installed_label node)"
+    echo_note "5) Install Symfony-CLI $(installed_label symfony)"
     echo_note ""
     echo_note "0) Return to Main Menu"
     echo -ne "\n${YELLOW}Enter your choice:${NC} "

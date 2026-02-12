@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Metadata:
+# Requires: mysql or mariadb or postgresql client binaries
+# Privileges: root or sudo
+# Target distro: Debian/Ubuntu
+# Side effects: creates databases/users and grants privileges
+# Safe to re-run: mostly yes (idempotent create-if-not-exists logic)
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
