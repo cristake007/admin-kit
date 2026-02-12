@@ -38,10 +38,25 @@ echo_note()   { _print "$1" "$CYAN"; }
 # Pause for user input
 pause(){ echo_info "Press Enter to continue..."; read -r; }
 
+terminal_width() {
+  local width="${COLUMNS:-0}"
+  if [[ "$width" -le 0 ]]; then
+    if command -v tput >/dev/null 2>&1; then
+      width="$(tput cols 2>/dev/null || echo 0)"
+    fi
+  fi
+  [[ "$width" =~ ^[0-9]+$ ]] || width=0
+  if [[ "$width" -le 0 ]]; then
+    width=80
+  fi
+  printf '%s\n' "$width"
+}
+
 # Display a header with system info
 display_header() {
     local text="$1"
-    local width=$(tput cols)
+    local width
+    width="$(terminal_width)"
     local padding=$(( (width - ${#text}) / 2 ))
 
     printf "\n%${padding}s${GREEN}%s${NC}%${padding}s\n\n" "" "$text" ""
@@ -51,7 +66,21 @@ display_header() {
     echo_info "Last Boot: $(who -b | awk '{print $3,$4}')"
     echo_info "CPU Model: $(lscpu | grep "Model name" | sed 's/Model name://' | xargs)"
     echo_info "CPU Cores: Physical: $(grep -c ^processor /proc/cpuinfo), Logical: $(nproc)"
-    printf "%$(tput cols)s\n" | tr ' ' '-'
+    printf "%${width}s\n" | tr ' ' '-'
+}
+
+show_script_metadata() {
+  local requires="${1:-N/A}"
+  local privileges="${2:-N/A}"
+  local distro="${3:-N/A}"
+  local side_effects="${4:-N/A}"
+  local rerun_safe="${5:-N/A}"
+
+  echo_note "Requirements: ${requires}"
+  echo_note "Privileges: ${privileges}"
+  echo_note "Target distro: ${distro}"
+  echo_note "Side effects: ${side_effects}"
+  echo_note "Safe to re-run: ${rerun_safe}"
 }
 
 #======================================================================
@@ -123,6 +152,7 @@ err_trap() {
 # yes/no prompt
 confirm() {
     read -r -p "${1:-Proceed?} (Y/n): " ans
+    echo
     [[ -z "$ans" || "$ans" =~ ^[Yy]$ ]]
 }
 
@@ -131,6 +161,7 @@ confirm_skip() {
   local ans
   while true; do
     read -r -p "${prompt} (y=yes / n=no / s=skip): " ans
+    echo
     case "$ans" in
       [Yy]) return 0 ;;
       [Nn]) return 1 ;;
@@ -148,10 +179,33 @@ confirm_skip() {
 
 # ensure script is run with sudo privileges
 need_sudo(){
+  if [[ $EUID -eq 0 ]]; then
+    return 0
+  fi
+
+  if ! command -v sudo >/dev/null 2>&1; then
+    echo_error "sudo is required for this script when not running as root."
+    return 1
+  fi
+
   if [[ $EUID -ne 0 ]]; then
     echo_info "Elevating privileges with sudo..."
     sudo -v || { echo_error "sudo failed."; return 1; }
   fi
+}
+
+run_privileged() {
+  if [[ $EUID -eq 0 ]]; then
+    "$@"
+    return
+  fi
+
+  if ! command -v sudo >/dev/null 2>&1; then
+    echo_error "sudo is required for privileged command: $*"
+    return 1
+  fi
+
+  sudo "$@"
 }
 
 # Returns 0 if there's at least one non-root user (uid >= 1000) in sudo or wheel
@@ -199,24 +253,24 @@ user_exists() {
 # Apt helpers (Debian/Ubuntu)
 export DEBIAN_FRONTEND=noninteractive
 
-apt_update(){ sudo apt-get update -y; }
+apt_update(){ run_privileged apt-get update -y; }
 
 apt_upgrade(){
-  sudo apt-get -o Dpkg::Options::="--force-confdef" \
-               -o Dpkg::Options::="--force-confold" \
-               dist-upgrade -y
+  run_privileged apt-get -o Dpkg::Options::="--force-confdef" \
+                         -o Dpkg::Options::="--force-confold" \
+                         dist-upgrade -y
 }
 
-apt_install(){ sudo apt-get install -y "$@"; }
+apt_install(){ run_privileged apt-get install -y "$@"; }
 
-apt_remove(){ sudo apt-get remove -y "$@"; }
+apt_remove(){ run_privileged apt-get remove -y "$@"; }
 
 # Convenience: install multiple packages (Debian)
 install_items(){
   local kind="${1:-package}"; shift || true
   if [[ $# -eq 0 ]]; then echo_error "No ${kind}s specified."; return 1; fi
-  sudo apt-get update -y
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+  run_privileged apt-get update -y
+  run_privileged env DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
 }
 
 # Smarter package/binary detector
@@ -263,9 +317,9 @@ apt_is_installed() {
 # MySQL repo setup (Debian)
 add_mysql_repo() {
   echo_note "Adding Oracle MySQL APT repository (8.4 LTS)..."
-  curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 | sudo gpg --dearmor -o "$MYSQL_KEYRING"
+  curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 | run_privileged gpg --dearmor -o "$MYSQL_KEYRING"
   echo "deb [signed-by=$MYSQL_KEYRING] http://repo.mysql.com/apt/debian/ bookworm mysql-8.4-lts mysql-tools" \
-    | sudo tee "$MYSQL_LIST" >/dev/null
+    | run_privileged tee "$MYSQL_LIST" >/dev/null
 }
 
 #======================================================================
