@@ -9,6 +9,7 @@ OS_ID_LIKE=""
 OS_FAMILY="unsupported"
 PKG_BACKEND=""
 SERVICE_BACKEND="unknown"
+FIREWALL_BACKEND="unknown"
 
 os_detect() {
   if [[ ! -r /etc/os-release ]]; then
@@ -26,9 +27,11 @@ os_detect() {
     *debian*|*ubuntu*)
       OS_FAMILY="debian"
       PKG_BACKEND="apt"
+      FIREWALL_BACKEND="ufw"
       ;;
     *rhel*|*fedora*|*rocky*|*almalinux*|*centos*)
       OS_FAMILY="rhel"
+      FIREWALL_BACKEND="firewalld"
       if command -v dnf >/dev/null 2>&1; then
         PKG_BACKEND="dnf"
       elif command -v yum >/dev/null 2>&1; then
@@ -40,14 +43,17 @@ os_detect() {
     *suse*|*opensuse*)
       OS_FAMILY="suse"
       PKG_BACKEND="zypper"
+      FIREWALL_BACKEND="firewalld"
       ;;
     *arch*)
       OS_FAMILY="arch"
       PKG_BACKEND="pacman"
+      FIREWALL_BACKEND="firewalld"
       ;;
     *)
       OS_FAMILY="unsupported"
       PKG_BACKEND=""
+      FIREWALL_BACKEND="unknown"
       ;;
   esac
 
@@ -65,4 +71,75 @@ os_require_supported() {
 
 os_family() {
   printf '%s\n' "$OS_FAMILY"
+}
+
+os_resolve_pkg() {
+  local capability="${1:?capability required}"
+
+  case "$capability" in
+    apache_server)
+      [[ "$OS_FAMILY" == "debian" ]] && printf 'apache2\n' || printf 'httpd\n'
+      ;;
+    mariadb_server)
+      [[ "$OS_FAMILY" == "arch" ]] && printf 'mariadb\n' || printf 'mariadb-server\n'
+      ;;
+    mysql_server)
+      case "$OS_FAMILY" in
+        debian) printf 'default-mysql-server\n' ;;
+        rhel|suse) printf 'mysql-server\n' ;;
+        *) return 1 ;;
+      esac
+      ;;
+    postgresql_server)
+      printf 'postgresql\n'
+      ;;
+    firewall_tool)
+      if [[ "$FIREWALL_BACKEND" == "ufw" ]]; then
+        printf 'ufw\n'
+      elif [[ "$FIREWALL_BACKEND" == "firewalld" ]]; then
+        printf 'firewalld\n'
+      else
+        return 1
+      fi
+      ;;
+    php_runtime_bundle)
+      case "$OS_FAMILY" in
+        debian) printf 'php php-cli php-mysql php-xml php-mbstring php-zip php-curl\n' ;;
+        rhel) printf 'php php-cli php-mysqlnd php-xml php-mbstring php-zip php-curl\n' ;;
+        suse) printf 'php8 php8-cli php8-mysql php8-xmlreader php8-mbstring php8-zip php8-curl\n' ;;
+        arch) printf 'php php-apache\n' ;;
+        *) return 1 ;;
+      esac
+      ;;
+    *)
+      error "Unknown package capability: $capability"
+      return 1
+      ;;
+  esac
+}
+
+os_resolve_service() {
+  local capability="${1:?capability required}"
+
+  case "$capability" in
+    apache)
+      [[ "$OS_FAMILY" == "debian" ]] && printf 'apache2\n' || printf 'httpd\n'
+      ;;
+    mysql)
+      [[ "$OS_FAMILY" == "debian" ]] && printf 'mysql\n' || printf 'mysqld\n'
+      ;;
+    mariadb)
+      printf 'mariadb\n'
+      ;;
+    postgresql)
+      printf 'postgresql\n'
+      ;;
+    firewall)
+      [[ "$FIREWALL_BACKEND" == "firewalld" ]] && printf 'firewalld\n' || return 1
+      ;;
+    *)
+      error "Unknown service capability: $capability"
+      return 1
+      ;;
+  esac
 }

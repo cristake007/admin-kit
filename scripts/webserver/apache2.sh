@@ -24,11 +24,10 @@ main() {
     return 1
   fi
 
-  local apache_pkg="apache2"
-  local apache_service="apache2"
-  case "$OS_FAMILY" in
-    rhel|suse|arch) apache_pkg="httpd"; apache_service="httpd" ;;
-  esac
+  local apache_pkg
+  local apache_service
+  apache_pkg="$(os_resolve_pkg apache_server)"
+  apache_service="$(os_resolve_service apache)"
 
   pkg_update_index
   pkg_install "$apache_pkg"

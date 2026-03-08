@@ -18,26 +18,20 @@ main() {
   os_detect
   os_require_supported
 
-  local certbot_pkg="certbot"
-  local plugin_pkg=""
-
   if [[ "$OS_FAMILY" == "arch" ]]; then
     error "Certbot helper script is not supported on arch in this toolkit."
     return 1
   fi
 
-  if [[ "$OS_FAMILY" == "debian" ]]; then
-    if pkg_is_installed apache2; then
-      plugin_pkg="python3-certbot-apache"
-    elif pkg_is_installed nginx; then
-      plugin_pkg="python3-certbot-nginx"
-    fi
-  else
-    if pkg_is_installed httpd; then
-      plugin_pkg="python3-certbot-apache"
-    elif pkg_is_installed nginx; then
-      plugin_pkg="python3-certbot-nginx"
-    fi
+  local certbot_pkg="certbot"
+  local plugin_pkg=""
+  local apache_pkg
+  apache_pkg="$(os_resolve_pkg apache_server)"
+
+  if pkg_is_installed "$apache_pkg"; then
+    plugin_pkg="python3-certbot-apache"
+  elif pkg_is_installed nginx; then
+    plugin_pkg="python3-certbot-nginx"
   fi
 
   pkg_update_index

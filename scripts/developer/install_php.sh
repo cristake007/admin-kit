@@ -18,13 +18,10 @@ main() {
   os_detect
   os_require_supported
 
-  local packages=()
-  case "$OS_FAMILY" in
-    debian) packages=(php php-cli php-mysql php-xml php-mbstring php-zip php-curl) ;;
-    rhel) packages=(php php-cli php-mysqlnd php-xml php-mbstring php-zip php-curl) ;;
-    suse) packages=(php8 php8-cli php8-mysql php8-xmlreader php8-mbstring php8-zip php8-curl) ;;
-    arch) packages=(php php-apache) ;;
-  esac
+  local packages_raw
+  local -a packages=()
+  packages_raw="$(os_resolve_pkg php_runtime_bundle)"
+  read -r -a packages <<<"$packages_raw"
 
   pkg_update_index
   pkg_install "${packages[@]}"

@@ -19,11 +19,10 @@ main() {
   os_detect
   os_require_supported
 
-  local pkg_name="postgresql"
-  local svc_name="postgresql"
-  if [[ "$OS_FAMILY" == "rhel" ]]; then
-    svc_name="postgresql"
-  fi
+  local pkg_name
+  local svc_name
+  pkg_name="$(os_resolve_pkg postgresql_server)"
+  svc_name="$(os_resolve_service postgresql)"
 
   pkg_update_index
   pkg_install "$pkg_name"
