@@ -58,10 +58,12 @@ main() {
     return 0
   fi
 
-  info "This workflow can add a Symfony package repository and install Symfony CLI system-wide."
+  info "This action can add a Symfony package repository and install Symfony CLI system-wide."
+  info "Prerequisites: root privileges, network access, and supported distro family."
+  info "Key side effects: repository configuration and package installation."
   info "Supported in this toolkit: Debian/Ubuntu and RHEL-family distributions."
-  if ! confirm "Continue with Symfony CLI installation?"; then
-    warn "Installation cancelled by user."
+  if ! confirm_proceed "Proceed with Symfony CLI installation?"; then
+    operator_aborted
     print_summary "cancelled" ""
     return 0
   fi

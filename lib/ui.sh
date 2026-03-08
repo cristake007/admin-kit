@@ -15,6 +15,15 @@ confirm() {
   [[ "$answer" =~ ^[Yy]$ ]]
 }
 
+confirm_proceed() {
+  local prompt="${1:-Proceed with these changes?}"
+  confirm "$prompt"
+}
+
+operator_aborted() {
+  warn "Aborted by operator."
+}
+
 _header_line() {
   local width="${1:-0}"
   if [[ "$width" -ge 20 ]]; then

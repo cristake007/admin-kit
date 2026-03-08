@@ -40,6 +40,13 @@ prompt_timezone() {
   done
 }
 
+show_preinstall_message() {
+  local requested="${1:-<unset>}"
+  info "This action will set the system timezone to '$requested'."
+  info "Prerequisites: root privileges and a valid timezone from timedatectl list-timezones."
+  info "Key side effects: system timezone configuration will change."
+}
+
 main() {
   need_root
 
@@ -67,11 +74,12 @@ main() {
     return 0
   fi
 
+  show_preinstall_message "$requested_timezone"
   info "Current timezone: $existing_timezone"
   info "Requested timezone: $requested_timezone"
 
-  if ! confirm "Apply timezone change to '$requested_timezone'?"; then
-    warn "Timezone change cancelled by user."
+  if ! confirm_proceed; then
+    operator_aborted
     return 0
   fi
 

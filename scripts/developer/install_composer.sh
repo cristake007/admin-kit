@@ -19,10 +19,11 @@ COMPOSER_METHOD_OFFICIAL="official"
 
 
 show_preinstall_message() {
-  info "Composer installation plan"
+  info "This action will install Composer using the selected method."
+  info "Prerequisites: root privileges, network access, and method-specific dependencies (php/curl for official installer)."
   info "- Method 1: distro package manager install (recommended for distro-managed updates)."
   info "- Method 2: official Composer installer (installs /usr/local/bin/composer)."
-  info "- Script is rerun-safe and will skip installation when Composer already matches the selected method."
+  info "Key side effects: package installation and/or /usr/local/bin/composer changes."
 }
 
 choose_method() {
@@ -149,8 +150,8 @@ main() {
     action_desc="Install Composer using the official installer"
   fi
 
-  if ! confirm "${action_desc}. Continue?"; then
-    warn "Installation cancelled by operator."
+  if ! confirm_proceed "${action_desc}. Proceed?"; then
+    operator_aborted
     print_verification_summary
     return 0
   fi

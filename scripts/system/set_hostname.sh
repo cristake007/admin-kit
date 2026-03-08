@@ -12,6 +12,14 @@ require_lib log
 require_lib core
 require_lib validate
 require_lib file
+require_lib ui
+
+show_preinstall_message() {
+  local target_fqdn="${1:?fqdn required}"
+  info "This action will set the static hostname to '$target_fqdn' and update /etc/hosts entry 127.0.1.1."
+  info "Prerequisites: root privileges and a valid hostname/domain format."
+  info "Key side effects: hostnamectl state and /etc/hosts will be modified (with backup)."
+}
 
 main() {
   need_root
@@ -48,6 +56,13 @@ main() {
   local fqdn="$short_name"
   if [[ -n "$domain_name" ]]; then
     fqdn="$short_name.$domain_name"
+  fi
+
+  show_preinstall_message "$fqdn"
+
+  if ! confirm_proceed; then
+    operator_aborted
+    return 0
   fi
 
   local current_static
