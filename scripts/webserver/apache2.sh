@@ -14,6 +14,7 @@ require_lib pkg
 require_lib service
 require_lib core
 require_lib ui
+require_lib verify
 
 show_preinstall_message() {
   info "This action will install Apache HTTP server and enable its service at boot."
@@ -46,6 +47,8 @@ main() {
   pkg_install "$apache_pkg"
   service_enable_now "$apache_service"
   success "Apache installed and enabled ($apache_service)."
+  verify_section "Service status"
+  verify_systemd_service "$apache_service" || true
 }
 
 main "$@"

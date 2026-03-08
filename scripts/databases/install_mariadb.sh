@@ -15,6 +15,7 @@ require_lib service
 require_lib core
 require_lib db
 require_lib ui
+require_lib verify
 
 MARIADB_HARDEN_MODE="interactive"
 
@@ -180,6 +181,10 @@ main() {
   service_enable_now "$svc_name"
   harden_mariadb_if_requested "$harden_mode"
   db_print_install_summary "mariadb" "$svc_name"
+  verify_section "Version checks"
+  verify_command "mariadb --version" mariadb --version || verify_command "mysql --version" mysql --version || true
+  verify_section "Service status"
+  verify_systemd_service "$svc_name" || true
 
   success "MariaDB installation workflow completed."
 }

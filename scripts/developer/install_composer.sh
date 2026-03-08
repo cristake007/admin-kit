@@ -13,6 +13,7 @@ require_lib core
 require_lib os
 require_lib pkg
 require_lib ui
+require_lib verify
 
 COMPOSER_METHOD_DISTRO="distro"
 COMPOSER_METHOD_OFFICIAL="official"
@@ -113,15 +114,15 @@ install_via_official_installer() {
 }
 
 print_verification_summary() {
-  printf '\nVerification summary:\n'
+  verify_section "Composer"
 
   if command -v composer >/dev/null 2>&1; then
-    printf '  composer path: %s\n' "$(command -v composer)"
-    printf '  composer --version: %s\n' "$(composer --version 2>/dev/null | head -n1 || echo 'command failed')"
+    verify_item "composer path" "$(command -v composer)"
   else
-    printf '  composer path: not found\n'
-    printf '  composer --version: not available\n'
+    verify_warning "composer path" "not found"
   fi
+
+  verify_command "composer --version" composer --version || true
 }
 
 main() {

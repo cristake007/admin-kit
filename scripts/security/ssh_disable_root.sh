@@ -14,6 +14,7 @@ require_lib file
 require_lib os
 require_lib service
 require_lib ui
+require_lib verify
 
 show_preinstall_message() {
   info "This action will set PermitRootLogin no in /etc/ssh/sshd_config."
@@ -53,7 +54,16 @@ main() {
     warn "SSH service unit not found; config changed but service not restarted."
   fi
 
+  local ssh_root_setting
+  ssh_root_setting="$(awk '
+    /^[[:space:]]*#/ {next}
+    /^[[:space:]]*PermitRootLogin[[:space:]]+/ {print $2; found=1; exit}
+    END {if (!found) print "<unset>"}
+  ' "$cfg")"
+
   success "Root SSH login disabled."
+  verify_section "Effective settings"
+  verify_item "PermitRootLogin" "$ssh_root_setting"
 }
 
 main "$@"
