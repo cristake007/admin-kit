@@ -169,6 +169,8 @@ main() {
 
     read -r -p "Choice: " choice
     if [[ "$choice" == "0" ]]; then
+      clear
+      success "Thanks for using Admin Kit. Goodbye."
       exit 0
     fi
 

@@ -24,6 +24,27 @@ _header_line() {
   fi
 }
 
+_print_centered() {
+  local text="$1"
+  local width="$2"
+  local text_len=0
+  local padding=0
+
+  if ! [[ "$width" =~ ^[0-9]+$ ]] || (( width <= 0 )); then
+    printf '%s\n' "$text"
+    return
+  fi
+
+  text_len=${#text}
+  if (( text_len >= width )); then
+    printf '%s\n' "$text"
+    return
+  fi
+
+  padding=$(((width - text_len) / 2))
+  printf '%*s%s\n' "$padding" '' "$text"
+}
+
 _os_pretty_name() {
   local pretty="unknown"
   if [[ -r /etc/os-release ]]; then
@@ -90,11 +111,11 @@ display_header() {
 
   printf '\n'
   _header_line "$term_width"
-  printf '%s\n' "ADMIN KIT :: $title"
+  _print_centered "ADMIN KIT :: $title" "$term_width"
   _header_line "$term_width"
   printf 'Host: %s\n' "$host"
   printf 'OS: %s\n' "$os_name"
   printf 'Kernel: %s\n' "$kernel"
   printf 'IP: %s\n' "$primary_ip"
-  printf 'Uptime: %s\n\n' "$uptime_text"
+  printf 'Uptime: %s\n\n\n' "$uptime_text"
 }
