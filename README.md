@@ -10,6 +10,9 @@ No CLI-only entrypoint scripts are currently supported.
 
 ## Menu dispatch map
 
+The menu is generated from one authoritative dispatch table in `admin_menu.sh`.
+Options are shown only when the mapped script exists and is executable.
+
 - `System`
   - `Update system` → `scripts/system/update_system.sh`
   - `Create privileged user` → `scripts/system/create_user.sh`

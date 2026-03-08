@@ -8,6 +8,48 @@ require_lib log
 require_lib ui
 require_lib core
 
+readonly -A CATEGORY_TITLES=(
+  [system]="System"
+  [webserver]="Webserver"
+  [databases]="Databases"
+  [security]="Security"
+  [developer]="Developer"
+  [custom]="Custom"
+)
+
+readonly -a CATEGORY_ORDER=(
+  system
+  webserver
+  databases
+  security
+  developer
+  custom
+)
+
+# category|label|relative_script_path
+readonly -a MENU_ACTIONS=(
+  "system|Update system|scripts/system/update_system.sh"
+  "system|Create privileged user|scripts/system/create_user.sh"
+  "system|Set timezone|scripts/system/set_timezone.sh"
+  "system|Set hostname|scripts/system/set_hostname.sh"
+  "system|Install common packages|scripts/system/common_packages.sh"
+  "webserver|Install Apache|scripts/webserver/apache2.sh"
+  "webserver|Install Nginx|scripts/webserver/nginx.sh"
+  "webserver|Install Certbot|scripts/webserver/certbot.sh"
+  "databases|Install MariaDB|scripts/databases/install_mariadb.sh"
+  "databases|Install MySQL|scripts/databases/install_mysql.sh"
+  "databases|Install PostgreSQL|scripts/databases/install_postgresql.sh"
+  "security|Disable SSH root login|scripts/security/ssh_disable_root.sh"
+  "security|Install fail2ban|scripts/security/install_fail2ban.sh"
+  "security|Install firewall tooling|scripts/security/install_ufw.sh"
+  "developer|Install extrepo|scripts/developer/install_extrepo.sh"
+  "developer|Install PHP|scripts/developer/install_php.sh"
+  "developer|Install Composer|scripts/developer/install_composer.sh"
+  "developer|Install Node.js|scripts/developer/install_nodejs.sh"
+  "developer|Install Symfony prerequisites|scripts/developer/install_symfony.sh"
+  "custom|ILIAS baseline workflow|scripts/custom/ilias.sh"
+)
+
 run_and_pause() {
   local rel_script="$1"
   if run_script "$rel_script"; then
@@ -18,146 +60,127 @@ run_and_pause() {
   pause
 }
 
-system_menu() {
-  while true; do
-    clear
-    display_header "System"
-    echo "1) Update system"
-    echo "2) Create privileged user"
-    echo "3) Set timezone"
-    echo "4) Set hostname"
-    echo "5) Install common packages"
-    echo "0) Back"
-    read -r -p "Choice: " choice
-    case "$choice" in
-      1) run_and_pause scripts/system/update_system.sh ;;
-      2) run_and_pause scripts/system/create_user.sh ;;
-      3) run_and_pause scripts/system/set_timezone.sh ;;
-      4) run_and_pause scripts/system/set_hostname.sh ;;
-      5) run_and_pause scripts/system/common_packages.sh ;;
-      0) return ;;
-      *) warn "Invalid option"; pause ;;
-    esac
+collect_available_actions() {
+  local category="$1"
+  local -n out_actions="$2"
+  local action_category=""
+  local label=""
+  local rel_script=""
+  local full_path=""
+
+  out_actions=()
+  for action in "${MENU_ACTIONS[@]}"; do
+    IFS='|' read -r action_category label rel_script <<<"$action"
+    [[ "$action_category" == "$category" ]] || continue
+
+    full_path="$PROJECT_ROOT/$rel_script"
+    [[ -f "$full_path" ]] || continue
+
+    if [[ ! -x "$full_path" ]]; then
+      chmod +x "$full_path" 2>/dev/null || true
+    fi
+
+    [[ -x "$full_path" ]] || continue
+    out_actions+=("$label|$rel_script")
   done
 }
 
-webserver_menu() {
+submenu() {
+  local category="$1"
+  local title="${CATEGORY_TITLES[$category]}"
+  local -a actions=()
+  local entry=""
+  local label=""
+  local rel_script=""
+  local choice=""
+
   while true; do
+    collect_available_actions "$category" actions
+
     clear
-    display_header "Webserver"
-    echo "1) Install Apache"
-    echo "2) Install Nginx"
-    echo "3) Install Certbot"
+    display_header "$title"
+
+    if [[ "${#actions[@]}" -eq 0 ]]; then
+      warn "No implemented actions are currently available in this category."
+      pause
+      return
+    fi
+
+    local index=1
+    for entry in "${actions[@]}"; do
+      IFS='|' read -r label rel_script <<<"$entry"
+      echo "$index) $label"
+      index=$((index + 1))
+    done
     echo "0) Back"
+
     read -r -p "Choice: " choice
-    case "$choice" in
-      1) run_and_pause scripts/webserver/apache2.sh ;;
-      2) run_and_pause scripts/webserver/nginx.sh ;;
-      3) run_and_pause scripts/webserver/certbot.sh ;;
-      0) return ;;
-      *) warn "Invalid option"; pause ;;
-    esac
+    if [[ "$choice" == "0" ]]; then
+      return
+    fi
+
+    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#actions[@]} )); then
+      IFS='|' read -r label rel_script <<<"${actions[$((choice - 1))]}"
+      run_and_pause "$rel_script"
+      continue
+    fi
+
+    warn "Invalid option"
+    pause
   done
 }
 
-database_menu() {
-  while true; do
-    clear
-    display_header "Databases"
-    echo "1) Install MariaDB"
-    echo "2) Install MySQL"
-    echo "3) Install PostgreSQL"
-    echo "0) Back"
-    read -r -p "Choice: " choice
-    case "$choice" in
-      1) run_and_pause scripts/databases/install_mariadb.sh ;;
-      2) run_and_pause scripts/databases/install_mysql.sh ;;
-      3) run_and_pause scripts/databases/install_postgresql.sh ;;
-      0) return ;;
-      *) warn "Invalid option"; pause ;;
-    esac
-  done
-}
+collect_available_categories() {
+  local -n out_categories="$1"
+  local category=""
+  local -a actions=()
 
-security_menu() {
-  while true; do
-    clear
-    display_header "Security"
-    echo "1) Disable SSH root login"
-    echo "2) Install fail2ban"
-    echo "3) Install firewall tooling"
-    echo "0) Back"
-    read -r -p "Choice: " choice
-    case "$choice" in
-      1) run_and_pause scripts/security/ssh_disable_root.sh ;;
-      2) run_and_pause scripts/security/install_fail2ban.sh ;;
-      3) run_and_pause scripts/security/install_ufw.sh ;;
-      0) return ;;
-      *) warn "Invalid option"; pause ;;
-    esac
-  done
-}
-
-developer_menu() {
-  while true; do
-    clear
-    display_header "Developer"
-    echo "1) Install extrepo"
-    echo "2) Install PHP"
-    echo "3) Install Composer"
-    echo "4) Install Node.js"
-    echo "5) Install Symfony prerequisites"
-    echo "0) Back"
-    read -r -p "Choice: " choice
-    case "$choice" in
-      1) run_and_pause scripts/developer/install_extrepo.sh ;;
-      2) run_and_pause scripts/developer/install_php.sh ;;
-      3) run_and_pause scripts/developer/install_composer.sh ;;
-      4) run_and_pause scripts/developer/install_nodejs.sh ;;
-      5) run_and_pause scripts/developer/install_symfony.sh ;;
-      0) return ;;
-      *) warn "Invalid option"; pause ;;
-    esac
-  done
-}
-
-custom_menu() {
-  while true; do
-    clear
-    display_header "Custom"
-    echo "1) ILIAS baseline workflow"
-    echo "0) Back"
-    read -r -p "Choice: " choice
-    case "$choice" in
-      1) run_and_pause scripts/custom/ilias.sh ;;
-      0) return ;;
-      *) warn "Invalid option"; pause ;;
-    esac
+  out_categories=()
+  for category in "${CATEGORY_ORDER[@]}"; do
+    collect_available_actions "$category" actions
+    if [[ "${#actions[@]}" -gt 0 ]]; then
+      out_categories+=("$category")
+    fi
   done
 }
 
 main() {
+  local -a categories=()
+  local category=""
+  local choice=""
+
   while true; do
+    collect_available_categories categories
+
     clear
     display_header "Admin Kit"
-    echo "1) System"
-    echo "2) Webserver"
-    echo "3) Databases"
-    echo "4) Security"
-    echo "5) Developer"
-    echo "6) Custom"
+
+    if [[ "${#categories[@]}" -eq 0 ]]; then
+      error "No implemented menu actions are currently available."
+      exit 1
+    fi
+
+    local index=1
+    for category in "${categories[@]}"; do
+      echo "$index) ${CATEGORY_TITLES[$category]}"
+      index=$((index + 1))
+    done
     echo "0) Exit"
+
     read -r -p "Choice: " choice
-    case "$choice" in
-      1) system_menu ;;
-      2) webserver_menu ;;
-      3) database_menu ;;
-      4) security_menu ;;
-      5) developer_menu ;;
-      6) custom_menu ;;
-      0) exit 0 ;;
-      *) warn "Invalid option"; pause ;;
-    esac
+    if [[ "$choice" == "0" ]]; then
+      clear
+      success "Thanks for using Admin Kit. Goodbye."
+      exit 0
+    fi
+
+    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#categories[@]} )); then
+      submenu "${categories[$((choice - 1))]}"
+      continue
+    fi
+
+    warn "Invalid option"
+    pause
   done
 }
 
