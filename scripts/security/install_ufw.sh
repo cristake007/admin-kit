@@ -86,7 +86,7 @@ main() {
     return 0
   fi
 
-  pkg_update_index
+  pkg_refresh_index --reason "firewall tooling installation"
   pkg_install "$firewall_pkg"
 
   if [[ "$FIREWALL_BACKEND" == "ufw" ]]; then

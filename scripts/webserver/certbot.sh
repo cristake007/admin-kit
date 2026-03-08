@@ -47,7 +47,7 @@ main() {
     return 0
   fi
 
-  pkg_update_index
+  pkg_refresh_index --reason "certbot installation"
   pkg_install "$certbot_pkg"
   if [[ -n "$plugin_pkg" ]]; then
     pkg_install "$plugin_pkg"

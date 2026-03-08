@@ -71,18 +71,18 @@ main() {
   case "$OS_FAMILY" in
     debian)
       install_method="Cloudsmith APT repo + symfony-cli package"
-      pkg_update_index
+      pkg_refresh_index --reason "symfony prerequisites installation"
       pkg_install ca-certificates curl gnupg
       install_cloudsmith_repo "deb"
-      pkg_update_index
+      pkg_refresh_index --mode always --reason "symfony repository metadata"
       pkg_install symfony-cli
       ;;
     rhel)
       install_method="Cloudsmith RPM repo + symfony-cli package"
-      pkg_update_index
+      pkg_refresh_index --reason "symfony prerequisites installation"
       pkg_install ca-certificates curl
       install_cloudsmith_repo "rpm"
-      pkg_update_index
+      pkg_refresh_index --mode always --reason "symfony repository metadata"
       pkg_install symfony-cli
       ;;
     suse|arch)

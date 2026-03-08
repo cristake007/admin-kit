@@ -4,6 +4,157 @@ set -Eeuo pipefail
 [[ -n "${__LIB_PKG_SH:-}" ]] && return 0
 __LIB_PKG_SH=1
 
+PKG_REFRESH_STALE_MINUTES_DEFAULT="${PKG_REFRESH_STALE_MINUTES_DEFAULT:-60}"
+PKG_REFRESH_STATE_FILE_DEFAULT="${PKG_REFRESH_STATE_FILE_DEFAULT:-/var/cache/admin-kit/pkg-index-refresh.timestamp}"
+
+pkg_refresh_mode_is_valid() {
+  local mode="${1:?mode required}"
+  case "$mode" in
+    auto|always|never|prompt) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+pkg_refresh_state_file() {
+  local state_file="$PKG_REFRESH_STATE_FILE_DEFAULT"
+
+  if [[ -n "${PKG_REFRESH_STATE_FILE:-}" ]]; then
+    state_file="$PKG_REFRESH_STATE_FILE"
+  fi
+
+  printf '%s\n' "$state_file"
+}
+
+pkg_refresh_mark_now() {
+  local state_file
+  state_file="$(pkg_refresh_state_file)"
+
+  mkdir -p "$(dirname -- "$state_file")"
+  date +%s > "$state_file"
+
+  export PKG_INDEX_REFRESHED=1
+  export PKG_INDEX_REFRESH_TS="$(cat "$state_file")"
+}
+
+pkg_refresh_last_ts() {
+  local state_file
+  state_file="$(pkg_refresh_state_file)"
+
+  if [[ -n "${PKG_INDEX_REFRESH_TS:-}" ]] && [[ "${PKG_INDEX_REFRESH_TS}" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "$PKG_INDEX_REFRESH_TS"
+    return 0
+  fi
+
+  if [[ -r "$state_file" ]]; then
+    local ts
+    ts="$(<"$state_file")"
+    if [[ "$ts" =~ ^[0-9]+$ ]]; then
+      printf '%s\n' "$ts"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+pkg_refresh_is_stale() {
+  local stale_minutes="${1:-$PKG_REFRESH_STALE_MINUTES_DEFAULT}"
+  local now_ts last_ts max_age
+
+  if ! [[ "$stale_minutes" =~ ^[0-9]+$ ]]; then
+    error "Invalid stale minutes value: $stale_minutes"
+    return 1
+  fi
+
+  if ! last_ts="$(pkg_refresh_last_ts)"; then
+    return 0
+  fi
+
+  now_ts="$(date +%s)"
+  max_age=$((stale_minutes * 60))
+  (( now_ts - last_ts >= max_age ))
+}
+
+pkg_refresh_index() {
+  local mode="auto"
+  local stale_minutes="$PKG_REFRESH_STALE_MINUTES_DEFAULT"
+  local reason="package operations"
+  local explicit_mode="${PKG_REFRESH_MODE:-}"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --mode)
+        mode="${2:?mode value required}"
+        shift 2
+        ;;
+      --stale-minutes)
+        stale_minutes="${2:?stale-minutes value required}"
+        shift 2
+        ;;
+      --reason)
+        reason="${2:?reason value required}"
+        shift 2
+        ;;
+      *)
+        error "Unknown pkg_refresh_index argument: $1"
+        return 1
+        ;;
+    esac
+  done
+
+  if [[ -n "$explicit_mode" ]]; then
+    mode="$explicit_mode"
+  fi
+
+  if ! pkg_refresh_mode_is_valid "$mode"; then
+    error "Invalid package refresh mode: $mode (supported: auto, always, never, prompt)"
+    return 1
+  fi
+
+  if [[ -n "${PKG_INDEX_REFRESHED:-}" ]]; then
+    info "Package index refresh policy: skipping refresh for $reason (already refreshed in this workflow)."
+    return 0
+  fi
+
+  case "$mode" in
+    never)
+      info "Package index refresh policy: skipping refresh for $reason (mode: never)."
+      return 0
+      ;;
+    always)
+      info "Package index refresh policy: refreshing now for $reason (mode: always)."
+      pkg_update_index
+      pkg_refresh_mark_now
+      return 0
+      ;;
+    prompt)
+      info "Package index refresh policy: operator prompt requested for $reason (mode: prompt)."
+      if declare -F confirm >/dev/null 2>&1; then
+        if ! confirm "Refresh package metadata before proceeding with $reason?"; then
+          info "Package index refresh skipped by operator for $reason."
+          return 0
+        fi
+        info "Refreshing package metadata for $reason after operator confirmation."
+        pkg_update_index
+        pkg_refresh_mark_now
+        return 0
+      fi
+
+      warn "Prompt mode requested but no confirm() helper is loaded. Falling back to mode: auto."
+      mode="auto"
+      ;;
+  esac
+
+  if pkg_refresh_is_stale "$stale_minutes"; then
+    info "Package index refresh policy: refreshing now for $reason (mode: auto, stale threshold ${stale_minutes}m)."
+    pkg_update_index
+    pkg_refresh_mark_now
+    return 0
+  fi
+
+  info "Package index refresh policy: skipping refresh for $reason (mode: auto, cache age within ${stale_minutes}m)."
+}
+
 pkg_update_index() {
   case "$PKG_BACKEND" in
     apt) apt-get update -y ;;

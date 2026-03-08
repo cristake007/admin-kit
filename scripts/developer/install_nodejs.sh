@@ -123,7 +123,7 @@ configure_nodesource_repo() {
 install_selected_track() {
   local selected_track="${1:?track required}"
 
-  pkg_update_index
+  pkg_refresh_index --reason "nodejs installation prerequisites"
 
   if [[ "$selected_track" == "$NODE_TRACK_DEFAULT" ]]; then
     pkg_install nodejs npm
@@ -131,7 +131,7 @@ install_selected_track() {
   fi
 
   configure_nodesource_repo "$selected_track"
-  pkg_update_index
+  pkg_refresh_index --mode always --reason "nodesource repository metadata"
   pkg_install nodejs
 }
 
