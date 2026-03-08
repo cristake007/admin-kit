@@ -102,6 +102,15 @@ os_resolve_pkg() {
         return 1
       fi
       ;;
+    common_baseline_bundle)
+      printf 'ca-certificates curl gnupg\n'
+      ;;
+    ilias_required_bundle)
+      case "$OS_FAMILY" in
+        debian|rhel|suse) printf 'imagemagick ghostscript ffmpeg clamav maven\n' ;;
+        *) return 1 ;;
+      esac
+      ;;
     php_runtime_bundle)
       case "$OS_FAMILY" in
         debian) printf 'php php-cli php-mysql php-xml php-mbstring php-zip php-curl\n' ;;
