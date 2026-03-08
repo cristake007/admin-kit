@@ -19,14 +19,14 @@ main() {
 
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
-  if apt_is_installed apache2; then
+  if apt_package_installed apache2; then
     echo_success "Apache2 is already installed."
     service_enable_now apache2
     service_status_line apache2
     exit 0
   fi
 
-  if apt_is_installed nginx; then
+  if apt_package_installed nginx; then
     echo_error "Nginx is installed. Remove it before installing Apache2."
     exit 1
   fi

@@ -21,7 +21,7 @@ main() {
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
   for p in "${pkgs[@]}"; do
-    apt_is_installed "$p" || missing+=("$p")
+    apt_package_installed "$p" || missing+=("$p")
   done
 
   if [[ ${#missing[@]} -eq 0 ]]; then

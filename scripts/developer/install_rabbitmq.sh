@@ -18,7 +18,7 @@ main() {
 
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
-  if apt_is_installed rabbitmq-server; then
+  if apt_package_installed rabbitmq-server; then
     echo_success "RabbitMQ is already installed."
   else
     apt_update

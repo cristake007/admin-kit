@@ -17,7 +17,7 @@ main() {
 
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
-  if apt_is_installed extrepo; then
+  if apt_package_installed extrepo; then
     echo_info "extrepo is already installed."
   else
     apt_update

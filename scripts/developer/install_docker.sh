@@ -19,7 +19,7 @@ main() {
 
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
-  if apt_is_installed docker-ce; then
+  if item_is_installed docker; then
     echo_success "Docker CE is already installed."
     service_enable_now docker
     docker -v || true

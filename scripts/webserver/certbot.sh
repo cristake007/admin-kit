@@ -21,7 +21,7 @@ main() {
   detect_server || exit 1
   echo_info "Using web server: ${SERVER}"
 
-  if apt_is_installed certbot; then
+  if apt_package_installed certbot; then
     echo_info "Certbot is already installed."
   else
     apt_update
@@ -29,11 +29,11 @@ main() {
   fi
 
   if [[ "$SERVER" == "apache" ]]; then
-    apt_is_installed python3-certbot-apache || apt_install python3-certbot-apache
+    apt_package_installed python3-certbot-apache || apt_install python3-certbot-apache
     service_enable_now apache2 || true
     service_status_line apache2
   else
-    apt_is_installed python3-certbot-nginx || apt_install python3-certbot-nginx
+    apt_package_installed python3-certbot-nginx || apt_install python3-certbot-nginx
     service_enable_now nginx || true
     service_status_line nginx
   fi
@@ -45,8 +45,8 @@ main() {
 
 detect_server() {
   local has_apache=1 has_nginx=1
-  if apt_is_installed apache2 || service_is_active apache2; then has_apache=0; fi
-  if apt_is_installed nginx || service_is_active nginx; then has_nginx=0; fi
+  if apt_package_installed apache2 || service_is_active apache2; then has_apache=0; fi
+  if apt_package_installed nginx || service_is_active nginx; then has_nginx=0; fi
 
   if (( has_apache != 0 && has_nginx != 0 )); then
     echo_error "No supported webserver detected. Install Apache or Nginx first."

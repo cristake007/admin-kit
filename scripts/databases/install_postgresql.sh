@@ -18,7 +18,7 @@ main() {
 
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
-  if apt_is_installed postgresql; then
+  if apt_package_installed postgresql; then
     echo_success "PostgreSQL is already installed."
     service_enable_now postgresql
     service_status_line postgresql

@@ -18,7 +18,7 @@ main() {
 
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
-  if apt_is_installed valkey-server; then
+  if apt_package_installed valkey-server; then
     echo_success "Valkey is already installed."
   else
     apt_update

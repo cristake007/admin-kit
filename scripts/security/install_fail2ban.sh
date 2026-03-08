@@ -21,7 +21,7 @@ main() {
 
   confirm "Proceed?" || { echo_info "Cancelled."; exit 0; }
 
-  if apt_is_installed fail2ban; then
+  if apt_package_installed fail2ban; then
     echo_info "Fail2Ban already installed."
   else
     apt_update

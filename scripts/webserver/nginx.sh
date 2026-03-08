@@ -19,14 +19,14 @@ main() {
 
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
-  if apt_is_installed nginx; then
+  if apt_package_installed nginx; then
     echo_success "Nginx is already installed."
     service_enable_now nginx
     service_status_line nginx
     exit 0
   fi
 
-  if apt_is_installed apache2; then
+  if apt_package_installed apache2; then
     echo_error "Apache is installed. Remove it before installing Nginx."
     exit 1
   fi

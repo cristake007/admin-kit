@@ -25,7 +25,7 @@ install_via_binary() {
   command_exists php || { apt_update; apt_install php-cli; }
   command_exists curl || { apt_update; apt_install curl; }
 
-  if apt_is_installed composer; then
+  if item_is_installed composer; then
     echo_info "Composer is already present."
     return 0
   fi

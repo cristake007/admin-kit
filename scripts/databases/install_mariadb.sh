@@ -19,14 +19,14 @@ main() {
 
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
-  if apt_is_installed mariadb-server; then
+  if apt_package_installed mariadb-server; then
     echo_success "MariaDB is already installed."
     service_enable_now mariadb
     service_status_line mariadb
     exit 0
   fi
 
-  if apt_is_installed mysql-server || apt_is_installed mysql-community-server; then
+  if apt_package_installed mysql-server || apt_package_installed mysql-community-server; then
     echo_error "MySQL is already installed. MariaDB conflicts with MySQL."
     exit 1
   fi

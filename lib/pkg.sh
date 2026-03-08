@@ -27,10 +27,17 @@ install_items() {
   apt_install "$@"
 }
 
-apt_is_installed() {
+# Strict Debian package-state check (dpkg only)
+apt_package_installed() {
+  local package_name="$1"
+  dpkg -s "$package_name" >/dev/null 2>&1
+}
+
+# Broad installed-item check (any supported install path/source)
+item_is_installed() {
   local name="$1"
 
-  if dpkg -s "$name" >/dev/null 2>&1; then
+  if apt_package_installed "$name"; then
     return 0
   fi
 
@@ -42,7 +49,7 @@ apt_is_installed() {
     return 0
   fi
 
-  if systemctl list-unit-files 2>/dev/null | grep -q "^${name}.service"; then
+  if systemctl list-unit-files 2>/dev/null | grep -q "^${name}\.service"; then
     return 0
   fi
 
