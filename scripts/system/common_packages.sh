@@ -40,7 +40,7 @@ main() {
 
   echo_note "Installing missing packages: ${missing[*]}"
   apt_install "${missing[@]}"
-
+  echo ""
   echo_success "Baseline packages installed successfully."
 }
 main "$@"
