@@ -15,6 +15,10 @@ require_lib service
 require_lib core
 require_lib ui
 require_lib verify
+require_lib install
+
+NGINX_PACKAGE="nginx"
+NGINX_SERVICE="nginx"
 
 show_preinstall_message() {
   info "This action will install Nginx and enable its service at boot."
@@ -22,7 +26,7 @@ show_preinstall_message() {
   info "Key side effects: nginx package installation and service activation."
 }
 
-main() {
+run_checks() {
   need_root
   os_detect
   os_require_supported
@@ -34,19 +38,27 @@ main() {
     error "Apache is active. Stop $apache_service before installing Nginx to avoid port conflicts."
     return 1
   fi
+}
 
-  show_preinstall_message
-  if ! confirm_proceed; then
-    operator_aborted
-    return 0
-  fi
-
+run_install() {
   pkg_refresh_index --reason "nginx installation"
-  pkg_install nginx
-  service_enable_now nginx
-  success "Nginx installed and enabled."
+  pkg_install "$NGINX_PACKAGE"
+  service_enable_now "$NGINX_SERVICE"
+}
+
+post_install() {
   verify_section "Service status"
-  verify_systemd_service nginx || true
+  verify_systemd_service "$NGINX_SERVICE" || true
+}
+
+main() {
+  run_install_workflow \
+    "Nginx installation" \
+    "Proceed with Nginx installation?" \
+    show_preinstall_message \
+    run_checks \
+    run_install \
+    post_install
 }
 
 main "$@"

@@ -13,6 +13,12 @@ require_lib core
 require_lib os
 require_lib pkg
 require_lib ui
+require_lib verify
+require_lib install
+
+PHP_PACKAGES_RAW=""
+
+declare -a PHP_PACKAGES=()
 
 show_preinstall_message() {
   info "This action will install PHP runtime packages and common extensions."
@@ -20,25 +26,33 @@ show_preinstall_message() {
   info "Key side effects: PHP packages will be installed."
 }
 
-main() {
+run_checks() {
   need_root
   os_detect
   os_require_supported
 
-  local packages_raw
-  local -a packages=()
-  packages_raw="$(os_resolve_pkg php_runtime_bundle)"
-  read -r -a packages <<<"$packages_raw"
+  PHP_PACKAGES_RAW="$(os_resolve_pkg php_runtime_bundle)"
+  read -r -a PHP_PACKAGES <<<"$PHP_PACKAGES_RAW"
+}
 
-  show_preinstall_message
-  if ! confirm_proceed; then
-    operator_aborted
-    return 0
-  fi
-
+run_install() {
   pkg_refresh_index --reason "php installation"
-  pkg_install "${packages[@]}"
-  success "PHP packages installed."
+  pkg_install "${PHP_PACKAGES[@]}"
+}
+
+post_install() {
+  verify_section "PHP runtime"
+  verify_command "php --version" php --version || true
+}
+
+main() {
+  run_install_workflow \
+    "PHP installation" \
+    "Proceed with PHP installation?" \
+    show_preinstall_message \
+    run_checks \
+    run_install \
+    post_install
 }
 
 main "$@"

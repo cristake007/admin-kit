@@ -16,6 +16,10 @@ require_lib core
 require_lib db
 require_lib ui
 require_lib verify
+require_lib install
+
+MYSQL_PACKAGE=""
+MYSQL_SERVICE=""
 
 show_preinstall_message() {
   info "This action will install MySQL server packages and enable/start the MySQL service."
@@ -23,7 +27,7 @@ show_preinstall_message() {
   info "Key side effects: database packages and service state will change."
 }
 
-main() {
+run_checks() {
   need_root
   os_detect
   os_require_supported
@@ -33,33 +37,39 @@ main() {
     return 1
   fi
 
-  local pkg_name
-  local svc_name
-  pkg_name="$(os_resolve_pkg mysql_server)" || {
+  MYSQL_PACKAGE="$(os_resolve_pkg mysql_server)" || {
     error "MySQL package is unsupported on distro family: $OS_FAMILY"
     return 1
   }
-  svc_name="$(os_resolve_service mysql)"
+  MYSQL_SERVICE="$(os_resolve_service mysql)"
 
   if db_detect_conflicts "mysql"; then
     db_print_conflict_risk "mysql"
   fi
+}
 
-  show_preinstall_message
-  if ! confirm_proceed; then
-    operator_aborted
-    return 0
-  fi
-
+run_install() {
   pkg_refresh_index --reason "mysql installation"
-  pkg_install "$pkg_name"
-  service_enable_now "$svc_name"
-  db_print_install_summary "mysql" "$svc_name"
+  pkg_install "$MYSQL_PACKAGE"
+  service_enable_now "$MYSQL_SERVICE"
+}
+
+post_install() {
+  db_print_install_summary "mysql" "$MYSQL_SERVICE"
   verify_section "Version checks"
   verify_command "mysql --version" mysql --version || true
   verify_section "Service status"
-  verify_systemd_service "$svc_name" || true
-  success "MySQL installation completed."
+  verify_systemd_service "$MYSQL_SERVICE" || true
+}
+
+main() {
+  run_install_workflow \
+    "MySQL installation" \
+    "Proceed with MySQL installation?" \
+    show_preinstall_message \
+    run_checks \
+    run_install \
+    post_install
 }
 
 main "$@"

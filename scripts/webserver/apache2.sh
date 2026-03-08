@@ -15,6 +15,7 @@ require_lib service
 require_lib core
 require_lib ui
 require_lib verify
+require_lib install
 
 show_preinstall_message() {
   info "This action will install Apache HTTP server and enable its service at boot."
@@ -22,7 +23,7 @@ show_preinstall_message() {
   info "Key side effects: apache package installation and service activation."
 }
 
-main() {
+run_checks() {
   need_root
   os_detect
   os_require_supported
@@ -33,22 +34,30 @@ main() {
   fi
 
   local apache_pkg
-  local apache_service
   apache_pkg="$(os_resolve_pkg apache_server)"
-  apache_service="$(os_resolve_service apache)"
+  APACHE_PKG="$apache_pkg"
+  APACHE_SERVICE="$(os_resolve_service apache)"
+}
 
-  show_preinstall_message
-  if ! confirm_proceed; then
-    operator_aborted
-    return 0
-  fi
-
+run_install() {
   pkg_refresh_index --reason "apache installation"
-  pkg_install "$apache_pkg"
-  service_enable_now "$apache_service"
-  success "Apache installed and enabled ($apache_service)."
+  pkg_install "$APACHE_PKG"
+  service_enable_now "$APACHE_SERVICE"
+}
+
+post_install() {
   verify_section "Service status"
-  verify_systemd_service "$apache_service" || true
+  verify_systemd_service "$APACHE_SERVICE" || true
+}
+
+main() {
+  run_install_workflow \
+    "Apache installation" \
+    "Proceed with Apache installation?" \
+    show_preinstall_message \
+    run_checks \
+    run_install \
+    post_install
 }
 
 main "$@"

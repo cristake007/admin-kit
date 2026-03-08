@@ -14,8 +14,12 @@ require_lib os
 require_lib pkg
 require_lib ui
 require_lib verify
+require_lib install
 
 NODE_TRACK_DEFAULT="default"
+NODE_SELECTED_TRACK="$NODE_TRACK_DEFAULT"
+NODE_SKIP_INSTALL=0
+
 node_current_major() {
   if ! command -v node >/dev/null 2>&1; then
     return 1
@@ -121,58 +125,56 @@ configure_nodesource_repo() {
   rm -f "$setup_script"
 }
 
-install_selected_track() {
-  local selected_track="${1:?track required}"
+run_checks() {
+  need_root
+  os_detect
+  os_require_supported
+
+  NODE_SELECTED_TRACK="$(choose_track)"
+  track_is_supported "$NODE_SELECTED_TRACK"
+
+  if selected_track_satisfied "$NODE_SELECTED_TRACK"; then
+    success "No installation changes required."
+    verify_section "Node.js toolchain"
+    verify_command "node -v" node -v || true
+    verify_command "npm -v" npm -v || true
+    NODE_SKIP_INSTALL=1
+    return 0
+  fi
+}
+
+run_install() {
+  if [[ "$NODE_SKIP_INSTALL" -eq 1 ]]; then
+    info "Skipping Node.js install stage; target already satisfied."
+    return 0
+  fi
 
   pkg_refresh_index --reason "nodejs installation prerequisites"
 
-  if [[ "$selected_track" == "$NODE_TRACK_DEFAULT" ]]; then
+  if [[ "$NODE_SELECTED_TRACK" == "$NODE_TRACK_DEFAULT" ]]; then
     pkg_install nodejs npm
     return 0
   fi
 
-  configure_nodesource_repo "$selected_track"
+  configure_nodesource_repo "$NODE_SELECTED_TRACK"
   pkg_refresh_index --mode always --reason "nodesource repository metadata"
   pkg_install nodejs
 }
 
-print_verification_summary() {
+post_install() {
   verify_section "Node.js toolchain"
   verify_command "node -v" node -v || true
   verify_command "npm -v" npm -v || true
 }
 
 main() {
-  need_root
-  os_detect
-  os_require_supported
-
-  show_preinstall_message
-
-  local selected_track
-  selected_track="$(choose_track)"
-  track_is_supported "$selected_track"
-
-  if selected_track_satisfied "$selected_track"; then
-    success "No installation changes required."
-    print_verification_summary
-    return 0
-  fi
-
-  local action_desc="Install Node.js from distro packages"
-  if [[ "$selected_track" != "$NODE_TRACK_DEFAULT" ]]; then
-    action_desc="Install Node.js major ${selected_track}.x from NodeSource"
-  fi
-
-  if ! confirm_proceed "${action_desc}. Proceed?"; then
-    operator_aborted
-    print_verification_summary
-    return 0
-  fi
-
-  install_selected_track "$selected_track"
-  success "Node.js installation workflow completed."
-  print_verification_summary
+  run_install_workflow \
+    "Node.js installation" \
+    "Proceed with Node.js installation?" \
+    show_preinstall_message \
+    run_checks \
+    run_install \
+    post_install
 }
 
 main "$@"

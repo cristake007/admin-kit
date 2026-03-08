@@ -16,8 +16,11 @@ require_lib core
 require_lib db
 require_lib ui
 require_lib verify
+require_lib install
 
 MARIADB_HARDEN_MODE="interactive"
+MARIADB_PACKAGE=""
+MARIADB_SERVICE=""
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
@@ -54,18 +57,15 @@ show_preinstall_message() {
 resolve_hardening_mode() {
   local mode="$1"
   if [[ "$mode" != "interactive" ]]; then
-    printf '%s
-' "$mode"
+    printf '%s\n' "$mode"
     return 0
   fi
   if [[ ! -t 0 ]]; then
     info "Non-interactive session detected; optional MariaDB hardening will be skipped."
-    printf 'skip
-'
+    printf 'skip\n'
     return 0
   fi
-  printf 'interactive
-'
+  printf 'interactive\n'
 }
 
 get_db_client() {
@@ -144,49 +144,57 @@ harden_mariadb_if_requested() {
   success "MariaDB hardening applied successfully."
 }
 
-main() {
-  parse_args "$@"
-
+run_checks() {
   need_root
   os_detect
   os_require_supported
 
-  local pkg_name svc_name harden_mode
-  pkg_name="$(os_resolve_pkg mariadb_server)"
-  svc_name="$(os_resolve_service mariadb)"
+  MARIADB_PACKAGE="$(os_resolve_pkg mariadb_server)"
+  MARIADB_SERVICE="$(os_resolve_service mariadb)"
 
   if db_detect_conflicts "mariadb"; then
     db_print_conflict_risk "mariadb"
   fi
 
+  local harden_mode
   harden_mode="$(resolve_hardening_mode "$MARIADB_HARDEN_MODE")"
   if [[ "$harden_mode" == "interactive" ]]; then
     info "Optional hardening removes anonymous users, removes non-local root hosts, and drops the test database."
     if confirm_proceed "Proceed with optional MariaDB hardening?"; then
-      harden_mode="apply"
+      MARIADB_HARDEN_MODE="apply"
     else
-      harden_mode="skip"
+      MARIADB_HARDEN_MODE="skip"
       operator_aborted
     fi
+  else
+    MARIADB_HARDEN_MODE="$harden_mode"
   fi
+}
 
-  show_preinstall_message
-  if ! confirm_proceed; then
-    operator_aborted
-    return 0
-  fi
-
+run_install() {
   pkg_refresh_index --reason "mariadb installation"
-  pkg_install "$pkg_name"
-  service_enable_now "$svc_name"
-  harden_mariadb_if_requested "$harden_mode"
-  db_print_install_summary "mariadb" "$svc_name"
+  pkg_install "$MARIADB_PACKAGE"
+  service_enable_now "$MARIADB_SERVICE"
+  harden_mariadb_if_requested "$MARIADB_HARDEN_MODE"
+}
+
+post_install() {
+  db_print_install_summary "mariadb" "$MARIADB_SERVICE"
   verify_section "Version checks"
   verify_command "mariadb --version" mariadb --version || verify_command "mysql --version" mysql --version || true
   verify_section "Service status"
-  verify_systemd_service "$svc_name" || true
+  verify_systemd_service "$MARIADB_SERVICE" || true
+}
 
-  success "MariaDB installation workflow completed."
+main() {
+  parse_args "$@"
+  run_install_workflow \
+    "MariaDB installation" \
+    "Proceed with MariaDB installation?" \
+    show_preinstall_message \
+    run_checks \
+    run_install \
+    post_install
 }
 
 main "$@"

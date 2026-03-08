@@ -15,6 +15,10 @@ require_lib service
 require_lib core
 require_lib ui
 require_lib verify
+require_lib install
+
+FIREWALL_PACKAGE=""
+FIREWALL_SERVICE=""
 
 ufw_rule_exists() {
   local rule_label="${1:?rule label required}"
@@ -70,33 +74,33 @@ show_preinstall_message() {
   info "Key side effects: firewall defaults/rules may change and firewall service may be enabled."
 }
 
-main() {
+run_checks() {
   need_root
   os_detect
   os_require_supported
 
-  local firewall_pkg
-  firewall_pkg="$(os_resolve_pkg firewall_tool)" || {
+  FIREWALL_PACKAGE="$(os_resolve_pkg firewall_tool)" || {
     error "No supported firewall package for distro family: $OS_FAMILY"
     return 1
   }
 
-  show_preinstall_message
-  if ! confirm_proceed; then
-    operator_aborted
-    return 0
+  if [[ "$FIREWALL_BACKEND" != "ufw" ]]; then
+    FIREWALL_SERVICE="$(os_resolve_service firewall)"
   fi
+}
 
+run_install() {
   pkg_refresh_index --reason "firewall tooling installation"
-  pkg_install "$firewall_pkg"
+  pkg_install "$FIREWALL_PACKAGE"
 
   if [[ "$FIREWALL_BACKEND" == "ufw" ]]; then
     configure_ufw_additively
   else
-    service_enable_now "$(os_resolve_service firewall)"
+    service_enable_now "$FIREWALL_SERVICE"
   fi
+}
 
-  success "Firewall installation and reconciliation completed using $FIREWALL_BACKEND."
+post_install() {
   verify_section "Firewall status"
   if [[ "$FIREWALL_BACKEND" == "ufw" ]]; then
     if command -v ufw >/dev/null 2>&1; then
@@ -105,8 +109,18 @@ main() {
       verify_warning "ufw status" "command not found"
     fi
   else
-    verify_systemd_service "$(os_resolve_service firewall)" || true
+    verify_systemd_service "$FIREWALL_SERVICE" || true
   fi
+}
+
+main() {
+  run_install_workflow \
+    "Firewall installation" \
+    "Proceed with firewall installation and additive baseline rules?" \
+    show_preinstall_message \
+    run_checks \
+    run_install \
+    post_install
 }
 
 main "$@"

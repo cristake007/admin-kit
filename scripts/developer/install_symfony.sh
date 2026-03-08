@@ -13,6 +13,10 @@ require_lib core
 require_lib ui
 require_lib os
 require_lib pkg
+require_lib install
+
+SYMFONY_INSTALL_METHOD="not started"
+SYMFONY_SKIP_INSTALL=0
 
 install_cloudsmith_repo() {
   local setup_variant="${1:?setup variant required}"
@@ -26,23 +30,14 @@ install_cloudsmith_repo() {
   rm -f "$setup_script"
 }
 
-print_summary() {
-  local install_method="$1"
-  local version_output="$2"
-
-  info "Verification summary:"
-  info "- Install method: $install_method"
-  if [[ -n "$version_output" ]]; then
-    success "- Symfony CLI version: $version_output"
-  else
-    warn "- Symfony CLI is not installed. Next action: install manually from https://symfony.com/download"
-  fi
+show_preinstall_message() {
+  info "This action can add a Symfony package repository and install Symfony CLI system-wide."
+  info "Prerequisites: root privileges, network access, and supported distro family."
+  info "Key side effects: repository configuration and package installation."
+  info "Supported in this toolkit: Debian/Ubuntu and RHEL-family distributions."
 }
 
-main() {
-  local install_method="not started"
-  local version_output=""
-
+run_checks() {
   need_root
   os_detect
 
@@ -52,42 +47,17 @@ main() {
   fi
 
   if command -v symfony >/dev/null 2>&1; then
-    install_method="already installed"
-    version_output="$(symfony version)"
-    print_summary "$install_method" "$version_output"
-    return 0
-  fi
-
-  info "This action can add a Symfony package repository and install Symfony CLI system-wide."
-  info "Prerequisites: root privileges, network access, and supported distro family."
-  info "Key side effects: repository configuration and package installation."
-  info "Supported in this toolkit: Debian/Ubuntu and RHEL-family distributions."
-  if ! confirm_proceed "Proceed with Symfony CLI installation?"; then
-    operator_aborted
-    print_summary "cancelled" ""
+    SYMFONY_INSTALL_METHOD="already installed"
+    SYMFONY_SKIP_INSTALL=1
+    success "Symfony CLI already installed: $(symfony version)"
     return 0
   fi
 
   case "$OS_FAMILY" in
-    debian)
-      install_method="Cloudsmith APT repo + symfony-cli package"
-      pkg_refresh_index --reason "symfony prerequisites installation"
-      pkg_install ca-certificates curl gnupg
-      install_cloudsmith_repo "deb"
-      pkg_refresh_index --mode always --reason "symfony repository metadata"
-      pkg_install symfony-cli
-      ;;
-    rhel)
-      install_method="Cloudsmith RPM repo + symfony-cli package"
-      pkg_refresh_index --reason "symfony prerequisites installation"
-      pkg_install ca-certificates curl
-      install_cloudsmith_repo "rpm"
-      pkg_refresh_index --mode always --reason "symfony repository metadata"
-      pkg_install symfony-cli
-      ;;
+    debian) SYMFONY_INSTALL_METHOD="Cloudsmith APT repo + symfony-cli package" ;;
+    rhel) SYMFONY_INSTALL_METHOD="Cloudsmith RPM repo + symfony-cli package" ;;
     suse|arch)
       error "Symfony CLI installation is not supported by this toolkit on OS family '$OS_FAMILY'."
-      print_summary "unsupported on $OS_FAMILY" ""
       return 1
       ;;
     *)
@@ -95,15 +65,50 @@ main() {
       return 1
       ;;
   esac
+}
 
-  if ! command -v symfony >/dev/null 2>&1; then
-    error "Symfony CLI installation finished without creating the 'symfony' command."
-    print_summary "$install_method" ""
-    return 1
+run_install() {
+  if [[ "$SYMFONY_SKIP_INSTALL" -eq 1 ]]; then
+    info "Skipping Symfony install stage; command already available."
+    return 0
   fi
 
-  version_output="$(symfony version)"
-  print_summary "$install_method" "$version_output"
+  case "$OS_FAMILY" in
+    debian)
+      pkg_refresh_index --reason "symfony prerequisites installation"
+      pkg_install ca-certificates curl gnupg
+      install_cloudsmith_repo "deb"
+      pkg_refresh_index --mode always --reason "symfony repository metadata"
+      pkg_install symfony-cli
+      ;;
+    rhel)
+      pkg_refresh_index --reason "symfony prerequisites installation"
+      pkg_install ca-certificates curl
+      install_cloudsmith_repo "rpm"
+      pkg_refresh_index --mode always --reason "symfony repository metadata"
+      pkg_install symfony-cli
+      ;;
+  esac
+}
+
+post_install() {
+  info "Verification summary:"
+  info "- Install method: $SYMFONY_INSTALL_METHOD"
+  if command -v symfony >/dev/null 2>&1; then
+    success "- Symfony CLI version: $(symfony version)"
+  else
+    warn "- Symfony CLI is not installed. Next action: install manually from https://symfony.com/download"
+  fi
+}
+
+main() {
+  run_install_workflow \
+    "Symfony CLI installation" \
+    "Proceed with Symfony CLI installation?" \
+    show_preinstall_message \
+    run_checks \
+    run_install \
+    post_install
 }
 
 main "$@"

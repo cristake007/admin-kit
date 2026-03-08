@@ -14,10 +14,12 @@ require_lib os
 require_lib pkg
 require_lib ui
 require_lib verify
+require_lib install
 
 COMPOSER_METHOD_DISTRO="distro"
 COMPOSER_METHOD_OFFICIAL="official"
-
+COMPOSER_SELECTED_METHOD="$COMPOSER_METHOD_DISTRO"
+COMPOSER_SKIP_INSTALL=0
 
 show_preinstall_message() {
   info "This action will install Composer using the selected method."
@@ -113,58 +115,52 @@ install_via_official_installer() {
   rm -f "$installer"
 }
 
-print_verification_summary() {
-  verify_section "Composer"
+run_checks() {
+  need_root
+  os_detect
+  os_require_supported
 
+  COMPOSER_SELECTED_METHOD="$(choose_method)"
+
+  method_is_supported "$COMPOSER_SELECTED_METHOD"
+
+  if selected_method_satisfied "$COMPOSER_SELECTED_METHOD"; then
+    COMPOSER_SKIP_INSTALL=1
+    success "No installation changes required."
+  fi
+}
+
+run_install() {
+  if [[ "$COMPOSER_SKIP_INSTALL" -eq 1 ]]; then
+    info "Skipping Composer install stage; selected method already satisfied."
+    return 0
+  fi
+
+  if [[ "$COMPOSER_SELECTED_METHOD" == "$COMPOSER_METHOD_DISTRO" ]]; then
+    install_via_distro_package
+  else
+    install_via_official_installer
+  fi
+}
+
+post_install() {
+  verify_section "Composer"
   if command -v composer >/dev/null 2>&1; then
     verify_item "composer path" "$(command -v composer)"
   else
     verify_warning "composer path" "not found"
   fi
-
   verify_command "composer --version" composer --version || true
 }
 
 main() {
-  need_root
-  os_detect
-  os_require_supported
-
-  show_preinstall_message
-
-  local selected_method
-  selected_method="$(choose_method)"
-
-  if ! method_is_supported "$selected_method"; then
-    warn "No changes were made."
-    return 1
-  fi
-
-  if selected_method_satisfied "$selected_method"; then
-    success "No installation changes required."
-    print_verification_summary
-    return 0
-  fi
-
-  local action_desc="Install Composer using distro package manager"
-  if [[ "$selected_method" == "$COMPOSER_METHOD_OFFICIAL" ]]; then
-    action_desc="Install Composer using the official installer"
-  fi
-
-  if ! confirm_proceed "${action_desc}. Proceed?"; then
-    operator_aborted
-    print_verification_summary
-    return 0
-  fi
-
-  if [[ "$selected_method" == "$COMPOSER_METHOD_DISTRO" ]]; then
-    install_via_distro_package
-  else
-    install_via_official_installer
-  fi
-
-  success "Composer installation workflow completed."
-  print_verification_summary
+  run_install_workflow \
+    "Composer installation" \
+    "Proceed with Composer installation?" \
+    show_preinstall_message \
+    run_checks \
+    run_install \
+    post_install
 }
 
 main "$@"
