@@ -13,6 +13,7 @@ require_lib os
 require_lib pkg
 require_lib service
 require_lib core
+require_lib db
 require_lib ui
 
 MARIADB_HARDEN_MODE="interactive"
@@ -197,11 +198,24 @@ main() {
   pkg_name="$(os_resolve_pkg mariadb_server)"
   svc_name="$(os_resolve_service mariadb)"
 
+  if db_detect_conflicts "mariadb"; then
+    db_print_conflict_risk "mariadb"
+    if [[ ! -t 0 ]]; then
+      error "Database conflict confirmation requires an interactive terminal. Aborting safely."
+      return 1
+    fi
+    if ! confirm "Proceed with MariaDB installation despite coexistence risk?"; then
+      warn "MariaDB installation aborted by operator choice."
+      return 1
+    fi
+  fi
+
   pkg_update_index
   pkg_install "$pkg_name"
   service_enable_now "$svc_name"
   choose_hardening_mode
   harden_mariadb_if_requested
+  db_print_install_summary "mariadb" "$svc_name"
 
   success "MariaDB installation workflow completed."
 }
