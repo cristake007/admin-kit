@@ -26,9 +26,12 @@ replace_or_add_key_value() {
   local key="${2:?key required}"
   local value="${3:?value required}"
 
+  local escaped_key
+  escaped_key="$(printf '%s' "$key" | sed -e 's/[][\\.^$*+?{}|()]/\\&/g')"
+
   touch "$file_path"
-  if grep -Eq "^[#[:space:]]*${key}[[:space:]]+" "$file_path"; then
-    sed -i -E "s|^[#[:space:]]*${key}[[:space:]]+.*$|${key} ${value}|" "$file_path"
+  if grep -Eq "^[#[:space:]]*${escaped_key}([[:space:]]+|=)" "$file_path"; then
+    sed -i -E "s|^[#[:space:]]*${escaped_key}([[:space:]]+|=).*$|${key} ${value}|" "$file_path"
   else
     printf '%s %s\n' "$key" "$value" >> "$file_path"
   fi

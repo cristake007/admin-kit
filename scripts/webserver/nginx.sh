@@ -19,8 +19,8 @@ main() {
   os_detect
   os_require_supported
 
-  local apache_service="apache2"
-  [[ "$OS_FAMILY" != "debian" ]] && apache_service="httpd"
+  local apache_service
+  apache_service="$(os_resolve_service apache)"
 
   if service_exists "$apache_service" && service_is_active "$apache_service"; then
     error "Apache is active. Stop $apache_service before installing Nginx to avoid port conflicts."
