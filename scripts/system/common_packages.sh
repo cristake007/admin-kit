@@ -19,13 +19,28 @@ main() {
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
   local packages=(ca-certificates curl gnupg lsb-release)
+  local missing=()
+  local pkg
+
+  for pkg in "${packages[@]}"; do
+    if apt_package_installed "$pkg"; then
+      echo_info "Package already installed: $pkg"
+    else
+      missing+=("$pkg")
+    fi
+  done
+
+  if [[ ${#missing[@]} -eq 0 ]]; then
+    echo_success "All baseline packages are already installed."
+    return 0
+  fi
 
   echo_note "Updating package index..."
   apt_update
-  echo_note "Installing packages..."
-  apt_install "${packages[@]}"
+
+  echo_note "Installing missing packages: ${missing[*]}"
+  apt_install "${missing[@]}"
 
   echo_success "Baseline packages installed successfully."
 }
-
 main "$@"
