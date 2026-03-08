@@ -16,10 +16,10 @@ main() {
 
   run_script scripts/custom/env_file.sh
   run_script scripts/custom/create_directories.sh
+  run_script scripts/system/common_packages.sh ilias
   run_script scripts/webserver/apache2.sh
   run_script scripts/developer/install_php.sh
   run_script scripts/databases/install_mariadb.sh
-  run_script scripts/custom/system_required_packages.sh
 
   success "ILIAS quick baseline workflow completed."
 }

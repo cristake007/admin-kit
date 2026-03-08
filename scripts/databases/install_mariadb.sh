@@ -117,11 +117,10 @@ main() {
   os_detect
   os_require_supported
 
-  local pkg_name="mariadb-server"
-  local svc_name="mariadb"
-  if [[ "$OS_FAMILY" == "arch" ]]; then
-    pkg_name="mariadb"
-  fi
+  local pkg_name
+  local svc_name
+  pkg_name="$(os_resolve_pkg mariadb_server)"
+  svc_name="$(os_resolve_service mariadb)"
 
   pkg_update_index
   pkg_install "$pkg_name"

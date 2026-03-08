@@ -1,12 +1,20 @@
 # admin-kit
 
-A Bash admin toolkit with one interactive menu entrypoint.
+A Bash admin toolkit with one interactive entrypoint and one shared library stack.
 
 ## Supported entrypoint
 
 - `./admin_menu.sh`
 
-No CLI-only entrypoint scripts are currently supported.
+No additional standalone CLI entrypoints are supported.
+
+## Canonical architecture
+
+- `scripts/bootstrap.sh` is the only loader.
+- `lib/*.sh` modules are the only shared helper APIs.
+- Top-level action scripts live under `scripts/{system,webserver,databases,security,developer,custom}`.
+- OS/distro differences are handled in `lib/os.sh` through capability resolvers (`os_resolve_pkg`, `os_resolve_service`) and backend detection.
+- Package and service operations are centralized in `lib/pkg.sh` and `lib/service.sh`.
 
 ## Menu dispatch map
 
@@ -39,8 +47,3 @@ Options are shown only when the mapped script exists and is executable.
   - `Install Symfony prerequisites` → `scripts/developer/install_symfony.sh`
 - `Custom`
   - `ILIAS baseline workflow` → `scripts/custom/ilias.sh`
-
-## Internal modules
-
-- Shared code lives in `lib/*.sh` modules and is loaded via `scripts/bootstrap.sh`.
-- Helper workflows used by top-level scripts remain under `scripts/custom/`.

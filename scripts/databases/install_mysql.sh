@@ -19,21 +19,18 @@ main() {
   os_detect
   os_require_supported
 
-  local pkg_name="mysql-server"
-  local svc_name="mysql"
+  if [[ "$OS_FAMILY" == "arch" ]]; then
+    error "MySQL installer is unsupported on arch in this toolkit. Use MariaDB instead."
+    return 1
+  fi
 
-  case "$OS_FAMILY" in
-    debian) pkg_name="default-mysql-server"; svc_name="mysql" ;;
-    rhel|suse) pkg_name="mysql-server"; svc_name="mysqld" ;;
-    arch)
-      error "MySQL installer is unsupported on arch in this toolkit. Use MariaDB instead."
-      return 1
-      ;;
-    *)
-      error "Unsupported distro family for MySQL installer: $OS_FAMILY"
-      return 1
-      ;;
-  esac
+  local pkg_name
+  local svc_name
+  pkg_name="$(os_resolve_pkg mysql_server)" || {
+    error "MySQL package is unsupported on distro family: $OS_FAMILY"
+    return 1
+  }
+  svc_name="$(os_resolve_service mysql)"
 
   pkg_update_index
   pkg_install "$pkg_name"

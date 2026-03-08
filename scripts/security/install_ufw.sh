@@ -67,24 +67,22 @@ main() {
   os_detect
   os_require_supported
 
-  case "$OS_FAMILY" in
-    debian)
-      pkg_update_index
-      pkg_install ufw
-      configure_ufw_additively
-      success "UFW installation and additive reconciliation completed."
-      ;;
-    rhel|suse|arch)
-      pkg_update_index
-      pkg_install firewalld
-      service_enable_now firewalld
-      success "firewalld installation and reconciliation completed."
-      ;;
-    *)
-      error "No supported firewall workflow for family: $OS_FAMILY"
-      return 1
-      ;;
-  esac
+  local firewall_pkg
+  firewall_pkg="$(os_resolve_pkg firewall_tool)" || {
+    error "No supported firewall package for distro family: $OS_FAMILY"
+    return 1
+  }
+
+  pkg_update_index
+  pkg_install "$firewall_pkg"
+
+  if [[ "$FIREWALL_BACKEND" == "ufw" ]]; then
+    configure_ufw_additively
+  else
+    service_enable_now "$(os_resolve_service firewall)"
+  fi
+
+  success "Firewall installation and reconciliation completed using $FIREWALL_BACKEND."
 }
 
 main "$@"
