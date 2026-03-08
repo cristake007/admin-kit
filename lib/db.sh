@@ -151,34 +151,3 @@ db_server_version() {
       ;;
   esac
 }
-
-db_print_install_summary() {
-  local target="${1:?target required}"
-  local service_name="${2:?service name required}"
-  local version=""
-  local service_state="inactive"
-  local enable_state="disabled"
-
-  version="$(db_server_version "$target" 2>/dev/null | head -n1)"
-
-  if [[ "${SERVICE_BACKEND:-unknown}" == "systemd" ]]; then
-    if service_exists "$service_name"; then
-      if service_is_active "$service_name"; then
-        service_state="active"
-      fi
-      if service_is_enabled "$service_name"; then
-        enable_state="enabled"
-      fi
-    else
-      service_state="missing"
-      enable_state="missing"
-    fi
-  else
-    service_state="unknown"
-    enable_state="unknown"
-  fi
-
-  info "Verification summary for $(_db_label "$target"):"
-  info "- Server version: ${version:-unknown}"
-  info "- Service (${service_name}): ${service_state}, ${enable_state}"
-}

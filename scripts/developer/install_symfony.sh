@@ -13,6 +13,7 @@ require_lib core
 require_lib ui
 require_lib os
 require_lib pkg
+require_lib verify
 require_lib install
 
 SYMFONY_INSTALL_METHOD="not started"
@@ -24,20 +25,16 @@ install_cloudsmith_repo() {
   local setup_script
   setup_script="$(mktemp)"
 
-  info "Configuring Symfony repository (${setup_variant})."
   curl -fsSL "$setup_url" -o "$setup_script"
   bash "$setup_script"
   rm -f "$setup_script"
 }
 
-show_preinstall_message() {
+show_message() {
   info "This action can add a Symfony package repository and install Symfony CLI system-wide."
-  info "Prerequisites: root privileges, network access, and supported distro family."
-  info "Key side effects: repository configuration and package installation."
-  info "Supported in this toolkit: Debian/Ubuntu and RHEL-family distributions."
 }
 
-run_checks() {
+run_prereq_checks() {
   need_root
   os_detect
 
@@ -46,30 +43,31 @@ run_checks() {
     return 1
   fi
 
-  if command -v symfony >/dev/null 2>&1; then
-    SYMFONY_INSTALL_METHOD="already installed"
-    SYMFONY_SKIP_INSTALL=1
-    success "Symfony CLI already installed: $(symfony version)"
-    return 0
-  fi
-
   case "$OS_FAMILY" in
     debian) SYMFONY_INSTALL_METHOD="Cloudsmith APT repo + symfony-cli package" ;;
     rhel) SYMFONY_INSTALL_METHOD="Cloudsmith RPM repo + symfony-cli package" ;;
-    suse|arch)
-      error "Symfony CLI installation is not supported by this toolkit on OS family '$OS_FAMILY'."
-      return 1
-      ;;
     *)
-      error "Symfony CLI installation is unsupported for OS family '$OS_FAMILY'."
+      error "Symfony CLI installation is unsupported on OS family '$OS_FAMILY'."
       return 1
       ;;
   esac
 }
 
+check_already_installed() {
+  if command -v symfony >/dev/null 2>&1; then
+    SYMFONY_INSTALL_METHOD="already installed"
+    SYMFONY_SKIP_INSTALL=1
+    info "Symfony CLI already installed."
+  fi
+}
+
+check_conflicts() { info "No explicit Symfony package conflicts detected."; }
+
+show_install_plan() { verify_item "install method" "$SYMFONY_INSTALL_METHOD"; }
+
 run_install() {
   if [[ "$SYMFONY_SKIP_INSTALL" -eq 1 ]]; then
-    info "Skipping Symfony install stage; command already available."
+    info "Skipping installation; target already satisfied."
     return 0
   fi
 
@@ -91,24 +89,20 @@ run_install() {
   esac
 }
 
-post_install() {
-  info "Verification summary:"
-  info "- Install method: $SYMFONY_INSTALL_METHOD"
-  if command -v symfony >/dev/null 2>&1; then
-    success "- Symfony CLI version: $(symfony version)"
-  else
-    warn "- Symfony CLI is not installed. Next action: install manually from https://symfony.com/download"
-  fi
+run_service_config() { info "No service configuration required for Symfony CLI."; }
+
+post_install_verify() {
+  verify_section "Post-install verification"
+  verify_command "symfony version" symfony version || true
 }
+
+final_summary() { success "Symfony installation workflow finished."; }
 
 main() {
   run_install_workflow \
     "Symfony CLI installation" \
     "Proceed with Symfony CLI installation?" \
-    show_preinstall_message \
-    run_checks \
-    run_install \
-    post_install
+    show_message run_prereq_checks check_already_installed check_conflicts show_install_plan run_install run_service_config post_install_verify final_summary
 }
 
 main "$@"

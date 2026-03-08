@@ -50,15 +50,27 @@ verify_systemd_service() {
     return 1
   fi
 
-  if ! systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}' | grep -Fxq "${service_name}.service"; then
+  if ! declare -F service_exists >/dev/null 2>&1 || ! declare -F service_is_active >/dev/null 2>&1 || ! declare -F service_is_enabled >/dev/null 2>&1; then
+    verify_warning "service ${service_name}" "service helpers are not loaded"
+    return 1
+  fi
+
+  if ! service_exists "$service_name"; then
     verify_warning "service ${service_name}" "unit not found"
     return 1
   fi
 
-  local active_state enabled_state
-  active_state="$(systemctl is-active "$service_name" 2>/dev/null || true)"
-  enabled_state="$(systemctl is-enabled "$service_name" 2>/dev/null || true)"
+  local active_state="inactive"
+  local enabled_state="disabled"
 
-  verify_item "service ${service_name}" "active=${active_state:-unknown}, enabled=${enabled_state:-unknown}"
+  if service_is_active "$service_name"; then
+    active_state="active"
+  fi
+
+  if service_is_enabled "$service_name"; then
+    enabled_state="enabled"
+  fi
+
+  verify_item "service ${service_name}" "active=${active_state}, enabled=${enabled_state}"
   return 0
 }
