@@ -17,11 +17,45 @@ confirm() {
 
 _header_line() {
   local width="${1:-0}"
-  if [[ "$width" -ge 10 ]]; then
+  if [[ "$width" -ge 20 ]]; then
     printf '%*s\n' "$width" '' | tr ' ' '='
   else
-    printf '====================\n'
+    printf '========================================\n'
   fi
+}
+
+_os_pretty_name() {
+  local pretty="unknown"
+  if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    source /etc/os-release
+    pretty="${PRETTY_NAME:-unknown}"
+  fi
+  printf '%s\n' "$pretty"
+}
+
+_uptime_human() {
+  local uptime_text="unknown"
+  if command -v uptime >/dev/null 2>&1; then
+    uptime_text="$(uptime -p 2>/dev/null || true)"
+    uptime_text="${uptime_text#up }"
+  fi
+  if [[ -z "$uptime_text" || "$uptime_text" == "unknown" ]] && [[ -r /proc/uptime ]]; then
+    local total_seconds
+    total_seconds="$(cut -d'.' -f1 /proc/uptime 2>/dev/null || echo '')"
+    if [[ "$total_seconds" =~ ^[0-9]+$ ]]; then
+      uptime_text="${total_seconds}s"
+    fi
+  fi
+  printf '%s\n' "${uptime_text:-unknown}"
+}
+
+_primary_ip() {
+  local ip="unknown"
+  if command -v hostname >/dev/null 2>&1; then
+    ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+  fi
+  printf '%s\n' "${ip:-unknown}"
 }
 
 display_header() {
@@ -47,9 +81,20 @@ display_header() {
     term_width=0
   fi
 
+  local os_name=""
+  local uptime_text=""
+  local primary_ip=""
+  os_name="$(_os_pretty_name)"
+  uptime_text="$(_uptime_human)"
+  primary_ip="$(_primary_ip)"
+
   printf '\n'
   _header_line "$term_width"
-  printf '%s\n' "$title"
+  printf '%s\n' "ADMIN KIT :: $title"
   _header_line "$term_width"
-  printf 'Host: %s | Kernel: %s\n\n' "$host" "$kernel"
+  printf 'Host: %s\n' "$host"
+  printf 'OS: %s\n' "$os_name"
+  printf 'Kernel: %s\n' "$kernel"
+  printf 'IP: %s\n' "$primary_ip"
+  printf 'Uptime: %s\n\n' "$uptime_text"
 }
