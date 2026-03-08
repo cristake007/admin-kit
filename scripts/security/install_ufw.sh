@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-# Purpose: Install and configure host firewall tool with additive reconciliation.
+# Purpose: Install and configure firewall tooling (UFW or firewalld backend).
 # Supports: debian, rhel, suse, arch
 # Requires: root privileges
 # Safe to rerun: yes
-# Side effects: package install, firewall defaults/rules updates, service enablement
+# Side effects: package install; firewall defaults/rules/service state may change
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$THIS_DIR/../bootstrap.sh"
@@ -19,6 +19,7 @@ require_lib install
 
 FIREWALL_PACKAGE=""
 FIREWALL_SERVICE=""
+FIREWALL_SKIP_INSTALL=0
 
 ufw_rule_exists() {
   local rule_label="${1:?rule label required}"
@@ -37,44 +38,28 @@ ufw_set_default_if_needed() {
     return 0
   fi
 
-  info "Setting UFW default ${direction} to '${expected_policy}'"
   ufw default "$expected_policy" "$direction" >/dev/null
-  success "Updated UFW default ${direction} policy"
 }
 
 configure_ufw_additively() {
-  if ! command -v ufw >/dev/null 2>&1; then
-    error "ufw command not found after install"
-    return 1
-  fi
-
+  command -v ufw >/dev/null 2>&1 || { error "ufw command not found after install"; return 1; }
   ufw_set_default_if_needed incoming deny
   ufw_set_default_if_needed outgoing allow
 
-  if ufw_rule_exists "OpenSSH"; then
-    info "UFW rule already present: allow OpenSSH"
-  else
-    info "Adding missing UFW rule: allow OpenSSH"
+  if ! ufw_rule_exists "OpenSSH"; then
     ufw allow OpenSSH >/dev/null
-    success "Added UFW rule: allow OpenSSH"
   fi
 
-  if ufw status | grep -q "Status: active"; then
-    success "UFW is already active"
-  else
-    info "Enabling UFW"
+  if ! ufw status | grep -q "Status: active"; then
     ufw --force enable >/dev/null
-    success "UFW enabled"
   fi
 }
 
-show_preinstall_message() {
-  info "This action will install the distro firewall tool and apply additive baseline rules."
-  info "Prerequisites: root privileges and package repository access."
-  info "Key side effects: firewall defaults/rules may change and firewall service may be enabled."
+show_message() {
+  info "This action will install firewall tooling and apply additive baseline rules."
 }
 
-run_checks() {
+run_prereq_checks() {
   need_root
   os_detect
   os_require_supported
@@ -89,10 +74,35 @@ run_checks() {
   fi
 }
 
+check_already_installed() {
+  if pkg_is_installed "$FIREWALL_PACKAGE"; then
+    FIREWALL_SKIP_INSTALL=1
+    info "Firewall package already installed: $FIREWALL_PACKAGE"
+  fi
+}
+
+check_conflicts() { :; }
+
+show_install_plan() {
+  verify_item "package" "$FIREWALL_PACKAGE"
+  if [[ "$FIREWALL_BACKEND" == "ufw" ]]; then
+    verify_item "backend" "ufw (additive baseline rules)"
+  else
+    verify_item "backend" "$FIREWALL_BACKEND (service: $FIREWALL_SERVICE)"
+  fi
+}
+
 run_install() {
+  if [[ "$FIREWALL_SKIP_INSTALL" -eq 1 ]]; then
+    info "Skipping package installation; package already present."
+    return 0
+  fi
+
   pkg_refresh_index --reason "firewall tooling installation"
   pkg_install "$FIREWALL_PACKAGE"
+}
 
+run_service_config() {
   if [[ "$FIREWALL_BACKEND" == "ufw" ]]; then
     configure_ufw_additively
   else
@@ -100,8 +110,8 @@ run_install() {
   fi
 }
 
-post_install() {
-  verify_section "Firewall status"
+post_install_verify() {
+  verify_section "Post-install verification"
   if [[ "$FIREWALL_BACKEND" == "ufw" ]]; then
     if command -v ufw >/dev/null 2>&1; then
       verify_item "ufw status" "$(ufw status | head -n1)"
@@ -113,14 +123,13 @@ post_install() {
   fi
 }
 
+final_summary() { success "Firewall workflow finished."; }
+
 main() {
   run_install_workflow \
     "Firewall installation" \
-    "Proceed with firewall installation and additive baseline rules?" \
-    show_preinstall_message \
-    run_checks \
-    run_install \
-    post_install
+    "Proceed with firewall installation and baseline rules?" \
+    show_message run_prereq_checks check_already_installed check_conflicts show_install_plan run_install run_service_config post_install_verify final_summary
 }
 
 main "$@"

@@ -14,109 +14,85 @@ require_lib validate
 require_lib file
 require_lib ui
 require_lib verify
+require_lib install
 
-show_preinstall_message() {
-  local target_fqdn="${1:?fqdn required}"
-  info "This action will set the static hostname to '$target_fqdn' and update /etc/hosts entry 127.0.1.1."
-  info "Prerequisites: root privileges and a valid hostname/domain format."
-  info "Key side effects: hostnamectl state and /etc/hosts will be modified (with backup)."
+SHORT_NAME=""
+DOMAIN_NAME=""
+TARGET_FQDN=""
+CURRENT_STATIC=""
+
+show_message() {
+  info "This action will set the static hostname and update /etc/hosts entry 127.0.1.1."
+}
+
+gather_input() {
+  need_root
+
+  if [[ -z "$SHORT_NAME" ]]; then
+    read -r -p "Enter short hostname: " SHORT_NAME
+  fi
+
+  if [[ -z "$DOMAIN_NAME" ]]; then
+    info "Domain is optional. Leave blank for short hostname only."
+    read -r -p "Enter domain (optional): " DOMAIN_NAME
+  fi
+
+  validate_hostname "$SHORT_NAME" || { error "Invalid short hostname: $SHORT_NAME"; return 1; }
+  validate_domain "$DOMAIN_NAME" || { error "Invalid domain: $DOMAIN_NAME"; return 1; }
+
+  TARGET_FQDN="$SHORT_NAME"
+  if [[ -n "$DOMAIN_NAME" ]]; then
+    TARGET_FQDN="$SHORT_NAME.$DOMAIN_NAME"
+  fi
+}
+
+show_current_state() {
+  CURRENT_STATIC="$(hostnamectl --static 2>/dev/null || true)"
+  verify_section "Current hostname state"
+  verify_item "hostnamectl --static" "${CURRENT_STATIC:-<empty>}"
+}
+
+change_needed() {
+  [[ "$CURRENT_STATIC" != "$TARGET_FQDN" ]]
+}
+
+safety_checks() {
+  verify_section "Requested change"
+  verify_item "target hostname" "$TARGET_FQDN"
+  verify_item "/etc/hosts backup" "will be created before update"
+}
+
+apply_change() {
+  hostnamectl set-hostname "$TARGET_FQDN"
+  backup_file /etc/hosts
+  replace_or_add_key_value /etc/hosts "127.0.1.1" "$TARGET_FQDN $SHORT_NAME"
+}
+
+verify_result() {
+  verify_section "Result"
+  verify_item "hostnamectl --static" "$(hostnamectl --static 2>/dev/null || true)"
+  verify_item "hostnamectl --fqdn" "$(hostnamectl --fqdn 2>/dev/null || true)"
+}
+
+summary() {
+  success "Hostname configuration finished."
 }
 
 main() {
-  need_root
+  SHORT_NAME="${1:-}"
+  DOMAIN_NAME="${2:-}"
 
-  local short_name="${1:-}"
-  local domain_name=""
-  local domain_was_provided="false"
-
-  if [[ "$#" -ge 2 ]]; then
-    domain_name="$2"
-    domain_was_provided="true"
-  fi
-
-  if [[ -z "$short_name" ]]; then
-    read -r -p "Enter short hostname: " short_name
-  fi
-
-  if [[ "$domain_was_provided" == "false" ]]; then
-    info "Domain input is optional. Leave blank (\"\") to configure only the short hostname."
-    read -r -p "Enter domain (optional): " domain_name
-  fi
-
-  if ! validate_hostname "$short_name"; then
-    error "Invalid hostname '$short_name': use only lowercase letters, digits, and hyphens; must start/end with letter or digit; max 63 chars."
-    info "Valid short hostname examples: app01, web-server, db2"
-    return 1
-  fi
-  if ! validate_domain "$domain_name"; then
-    error "Invalid domain '$domain_name': use dot-separated labels with lowercase letters, digits, and hyphens; each label must start/end with letter or digit."
-    info "Valid FQDN examples: app01.example.com, web-server.prod.local, db2.internal.example"
-    return 1
-  fi
-
-  local fqdn="$short_name"
-  if [[ -n "$domain_name" ]]; then
-    fqdn="$short_name.$domain_name"
-  fi
-
-  show_preinstall_message "$fqdn"
-
-  if ! confirm_proceed; then
-    operator_aborted
-    return 0
-  fi
-
-  local current_static
-  current_static="$(hostnamectl --static 2>/dev/null || true)"
-
-  local step_name=""
-  local command_context=""
-
-  step_name="apply hostname via hostnamectl"
-  command_context="hostnamectl set-hostname '$fqdn'"
-  if [[ "$current_static" == "$fqdn" ]]; then
-    info "Step skipped ($step_name): hostname already set to '$fqdn'."
-  elif ! hostnamectl set-hostname "$fqdn"; then
-    error "Failed step: $step_name"
-    error "Command: $command_context"
-    return 1
-  else
-    success "Step completed: $step_name"
-  fi
-
-  step_name="backup /etc/hosts"
-  command_context="backup_file /etc/hosts"
-  if ! backup_file /etc/hosts; then
-    error "Failed step: $step_name"
-    error "Command: $command_context"
-    return 1
-  fi
-  success "Step completed: $step_name"
-
-  step_name="update hosts mapping"
-  command_context="replace_or_add_key_value /etc/hosts '127.0.1.1' '$fqdn $short_name'"
-  local desired_hosts_value="$fqdn $short_name"
-  local current_hosts_value
-  current_hosts_value="$(awk '$1 == "127.0.1.1" { $1=""; sub(/^[[:space:]]+/, ""); print; exit }' /etc/hosts || true)"
-  if [[ "$current_hosts_value" == "$desired_hosts_value" ]]; then
-    info "Step skipped ($step_name): /etc/hosts already maps 127.0.1.1 to '$desired_hosts_value'."
-  elif ! replace_or_add_key_value /etc/hosts "127.0.1.1" "$desired_hosts_value"; then
-    error "Failed step: $step_name"
-    error "Command: $command_context"
-    return 1
-  else
-    success "Step completed: $step_name"
-  fi
-
-  local effective_static
-  local effective_fqdn
-  effective_static="$(hostnamectl --static 2>/dev/null || true)"
-  effective_fqdn="$(hostnamectl --fqdn 2>/dev/null || true)"
-
-  success "Hostname configuration finished."
-  verify_section "Effective settings"
-  verify_item "hostnamectl --static" "${effective_static:-<empty>}"
-  verify_item "hostnamectl --fqdn" "${effective_fqdn:-<empty>}"
+  run_action_workflow \
+    "Set hostname" \
+    "Proceed with hostname change to '$TARGET_FQDN'?" \
+    show_message \
+    gather_input \
+    show_current_state \
+    change_needed \
+    safety_checks \
+    apply_change \
+    verify_result \
+    summary
 }
 
 main "$@"

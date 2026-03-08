@@ -17,47 +17,76 @@ require_lib ui
 require_lib verify
 require_lib install
 
-show_preinstall_message() {
+APACHE_PKG=""
+APACHE_SERVICE=""
+APACHE_SKIP_INSTALL=0
+
+show_message() {
   info "This action will install Apache HTTP server and enable its service at boot."
-  info "Prerequisites: root privileges and package repository access."
-  info "Key side effects: apache package installation and service activation."
 }
 
-run_checks() {
+run_prereq_checks() {
   need_root
   os_detect
   os_require_supported
+  APACHE_PKG="$(os_resolve_pkg apache_server)"
+  APACHE_SERVICE="$(os_resolve_service apache)"
+}
 
+check_already_installed() {
+  if pkg_is_installed "$APACHE_PKG" && service_exists "$APACHE_SERVICE" && service_is_active "$APACHE_SERVICE"; then
+    APACHE_SKIP_INSTALL=1
+    info "Apache package and active service already present."
+  fi
+}
+
+check_conflicts() {
   if service_exists nginx && service_is_active nginx; then
     error "Nginx is active. Stop nginx before installing Apache to avoid port conflicts."
     return 1
   fi
+}
 
-  local apache_pkg
-  apache_pkg="$(os_resolve_pkg apache_server)"
-  APACHE_PKG="$apache_pkg"
-  APACHE_SERVICE="$(os_resolve_service apache)"
+show_install_plan() {
+  verify_item "package" "$APACHE_PKG"
+  verify_item "service" "$APACHE_SERVICE"
 }
 
 run_install() {
+  if [[ "$APACHE_SKIP_INSTALL" -eq 1 ]]; then
+    info "Skipping package installation; target already satisfied."
+    return 0
+  fi
   pkg_refresh_index --reason "apache installation"
   pkg_install "$APACHE_PKG"
+}
+
+run_service_config() {
   service_enable_now "$APACHE_SERVICE"
 }
 
-post_install() {
-  verify_section "Service status"
+post_install_verify() {
+  verify_section "Post-install verification"
   verify_systemd_service "$APACHE_SERVICE" || true
+}
+
+final_summary() {
+  success "Apache installation workflow finished."
 }
 
 main() {
   run_install_workflow \
     "Apache installation" \
     "Proceed with Apache installation?" \
-    show_preinstall_message \
-    run_checks \
+    show_message \
+    run_prereq_checks \
+    check_already_installed \
+    check_conflicts \
+    show_install_plan \
     run_install \
-    post_install
+    run_service_config \
+    post_install_verify \
+    final_summary
 }
 
 main "$@"

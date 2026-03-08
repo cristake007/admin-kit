@@ -13,18 +13,18 @@ require_lib os
 require_lib pkg
 require_lib core
 require_lib ui
+require_lib verify
 require_lib install
 
 CERTBOT_PACKAGE="certbot"
 CERTBOT_PLUGIN_PACKAGE=""
+CERTBOT_SKIP_INSTALL=0
 
-show_preinstall_message() {
+show_message() {
   info "This action will install certbot and, when detected, the Apache or Nginx plugin package."
-  info "Prerequisites: root privileges and package repository access."
-  info "Key side effects: certbot packages will be installed."
 }
 
-run_checks() {
+run_prereq_checks() {
   need_root
   os_detect
   os_require_supported
@@ -33,7 +33,9 @@ run_checks() {
     error "Certbot helper script is not supported on arch in this toolkit."
     return 1
   fi
+}
 
+check_already_installed() {
   local apache_pkg
   apache_pkg="$(os_resolve_pkg apache_server)"
 
@@ -43,9 +45,32 @@ run_checks() {
   elif pkg_is_installed nginx; then
     CERTBOT_PLUGIN_PACKAGE="python3-certbot-nginx"
   fi
+
+  if pkg_is_installed "$CERTBOT_PACKAGE"; then
+    if [[ -z "$CERTBOT_PLUGIN_PACKAGE" ]] || pkg_is_installed "$CERTBOT_PLUGIN_PACKAGE"; then
+      CERTBOT_SKIP_INSTALL=1
+      info "Certbot target state already satisfied."
+    fi
+  fi
+}
+
+check_conflicts() { :; }
+
+show_install_plan() {
+  verify_item "package" "$CERTBOT_PACKAGE"
+  if [[ -n "$CERTBOT_PLUGIN_PACKAGE" ]]; then
+    verify_item "plugin package" "$CERTBOT_PLUGIN_PACKAGE"
+  else
+    verify_item "plugin package" "none auto-detected"
+  fi
 }
 
 run_install() {
+  if [[ "$CERTBOT_SKIP_INSTALL" -eq 1 ]]; then
+    info "Skipping package installation; target already satisfied."
+    return 0
+  fi
+
   pkg_refresh_index --reason "certbot installation"
   pkg_install "$CERTBOT_PACKAGE"
   if [[ -n "$CERTBOT_PLUGIN_PACKAGE" ]]; then
@@ -55,20 +80,22 @@ run_install() {
   fi
 }
 
-post_install() {
-  if [[ -n "$CERTBOT_PLUGIN_PACKAGE" ]]; then
-    success "Certbot plugin installed: $CERTBOT_PLUGIN_PACKAGE"
-  fi
+run_service_config() { :; }
+
+post_install_verify() {
+  verify_section "Post-install verification"
+  verify_command "certbot --version" certbot --version || true
+}
+
+final_summary() {
+  success "Certbot installation workflow finished."
 }
 
 main() {
   run_install_workflow \
     "Certbot installation" \
     "Proceed with certbot installation?" \
-    show_preinstall_message \
-    run_checks \
-    run_install \
-    post_install
+    show_message run_prereq_checks check_already_installed check_conflicts show_install_plan run_install run_service_config post_install_verify final_summary
 }
 
 main "$@"

@@ -21,12 +21,8 @@ COMPOSER_METHOD_OFFICIAL="official"
 COMPOSER_SELECTED_METHOD="$COMPOSER_METHOD_DISTRO"
 COMPOSER_SKIP_INSTALL=0
 
-show_preinstall_message() {
-  info "This action will install Composer using the selected method."
-  info "Prerequisites: root privileges, network access, and method-specific dependencies (php/curl for official installer)."
-  info "- Method 1: distro package manager install (recommended for distro-managed updates)."
-  info "- Method 2: official Composer installer (installs /usr/local/bin/composer)."
-  info "Key side effects: package installation and/or /usr/local/bin/composer changes."
+show_message() {
+  info "This action will install Composer using distro packages or the official installer."
 }
 
 choose_method() {
@@ -40,64 +36,43 @@ choose_method() {
   case "${choice:-1}" in
     1) printf '%s\n' "$COMPOSER_METHOD_DISTRO" ;;
     2) printf '%s\n' "$COMPOSER_METHOD_OFFICIAL" ;;
-    *)
-      error "Invalid selection: ${choice}."
-      return 1
-      ;;
+    *) error "Invalid selection: ${choice}."; return 1 ;;
   esac
 }
 
-method_is_supported() {
-  local method="${1:?method required}"
+run_prereq_checks() {
+  need_root
+  os_detect
+  os_require_supported
 
-  case "$method" in
-    "$COMPOSER_METHOD_DISTRO")
-      if [[ "$OS_FAMILY" == "unsupported" || -z "$PKG_BACKEND" ]]; then
-        error "Distro package install is unsupported on this system."
-        return 1
-      fi
-      return 0
-      ;;
-    "$COMPOSER_METHOD_OFFICIAL")
-      if ! command -v php >/dev/null 2>&1; then
-        error "Official installer requires PHP, but 'php' is not installed."
-        return 1
-      fi
-      if ! command -v curl >/dev/null 2>&1; then
-        error "Official installer requires curl, but 'curl' is not installed."
-        return 1
-      fi
-      return 0
-      ;;
-    *)
-      error "Unsupported Composer installation method: $method"
-      return 1
-      ;;
-  esac
+  COMPOSER_SELECTED_METHOD="$(choose_method)"
+
+  if [[ "$COMPOSER_SELECTED_METHOD" == "$COMPOSER_METHOD_OFFICIAL" ]]; then
+    command -v php >/dev/null 2>&1 || { error "Official installer requires PHP."; return 1; }
+    command -v curl >/dev/null 2>&1 || { error "Official installer requires curl."; return 1; }
+  fi
 }
 
-selected_method_satisfied() {
-  local method="${1:?method required}"
-
+check_already_installed() {
   if ! command -v composer >/dev/null 2>&1; then
-    return 1
-  fi
-
-  if [[ "$method" == "$COMPOSER_METHOD_DISTRO" ]]; then
-    if pkg_is_installed composer; then
-      info "Composer is already installed from distro packages."
-      return 0
-    fi
-    return 1
-  fi
-
-  if [[ -x /usr/local/bin/composer ]]; then
-    info "Composer is already installed at /usr/local/bin/composer."
     return 0
   fi
 
-  return 1
+  if [[ "$COMPOSER_SELECTED_METHOD" == "$COMPOSER_METHOD_DISTRO" ]] && pkg_is_installed composer; then
+    COMPOSER_SKIP_INSTALL=1
+    info "Composer already installed from distro packages."
+    return 0
+  fi
+
+  if [[ "$COMPOSER_SELECTED_METHOD" == "$COMPOSER_METHOD_OFFICIAL" ]] && [[ -x /usr/local/bin/composer ]]; then
+    COMPOSER_SKIP_INSTALL=1
+    info "Composer already installed at /usr/local/bin/composer."
+  fi
 }
+
+check_conflicts() { :; }
+
+show_install_plan() { verify_item "method" "$COMPOSER_SELECTED_METHOD"; }
 
 install_via_distro_package() {
   pkg_refresh_index --reason "composer distro installation"
@@ -106,33 +81,14 @@ install_via_distro_package() {
 
 install_via_official_installer() {
   local installer='/tmp/composer-setup.php'
-
-  info "Downloading Composer installer"
   curl -fsSL https://getcomposer.org/installer -o "$installer"
-
-  info "Installing Composer to /usr/local/bin/composer"
   php "$installer" --install-dir=/usr/local/bin --filename=composer --quiet
   rm -f "$installer"
 }
 
-run_checks() {
-  need_root
-  os_detect
-  os_require_supported
-
-  COMPOSER_SELECTED_METHOD="$(choose_method)"
-
-  method_is_supported "$COMPOSER_SELECTED_METHOD"
-
-  if selected_method_satisfied "$COMPOSER_SELECTED_METHOD"; then
-    COMPOSER_SKIP_INSTALL=1
-    success "No installation changes required."
-  fi
-}
-
 run_install() {
   if [[ "$COMPOSER_SKIP_INSTALL" -eq 1 ]]; then
-    info "Skipping Composer install stage; selected method already satisfied."
+    info "Skipping installation; selected method already satisfied."
     return 0
   fi
 
@@ -143,24 +99,21 @@ run_install() {
   fi
 }
 
-post_install() {
-  verify_section "Composer"
-  if command -v composer >/dev/null 2>&1; then
-    verify_item "composer path" "$(command -v composer)"
-  else
-    verify_warning "composer path" "not found"
-  fi
+run_service_config() { :; }
+
+post_install_verify() {
+  verify_section "Post-install verification"
+  verify_item "composer path" "$(command -v composer 2>/dev/null || echo not-found)"
   verify_command "composer --version" composer --version || true
 }
+
+final_summary() { success "Composer installation workflow finished."; }
 
 main() {
   run_install_workflow \
     "Composer installation" \
     "Proceed with Composer installation?" \
-    show_preinstall_message \
-    run_checks \
-    run_install \
-    post_install
+    show_message run_prereq_checks check_already_installed check_conflicts show_install_plan run_install run_service_config post_install_verify final_summary
 }
 
 main "$@"

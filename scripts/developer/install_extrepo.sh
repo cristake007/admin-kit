@@ -13,17 +13,15 @@ require_lib core
 require_lib os
 require_lib pkg
 require_lib ui
+require_lib verify
 require_lib install
 
 EXTREPO_PACKAGE="extrepo"
+EXTREPO_SKIP_INSTALL=0
 
-show_preinstall_message() {
-  info "This action will install the extrepo package."
-  info "Prerequisites: root privileges on Debian/Ubuntu with package repository access."
-  info "Key side effects: extrepo package will be installed."
-}
+show_message() { info "This action will install the extrepo package."; }
 
-run_checks() {
+run_prereq_checks() {
   need_root
   os_detect
   if [[ "$OS_FAMILY" != "debian" ]]; then
@@ -32,27 +30,41 @@ run_checks() {
   fi
 }
 
+check_already_installed() {
+  if pkg_is_installed "$EXTREPO_PACKAGE"; then
+    EXTREPO_SKIP_INSTALL=1
+    info "extrepo package already installed."
+  fi
+}
+
+check_conflicts() { :; }
+
+show_install_plan() { verify_item "package" "$EXTREPO_PACKAGE"; }
+
 run_install() {
+  if [[ "$EXTREPO_SKIP_INSTALL" -eq 1 ]]; then
+    info "Skipping installation; target already satisfied."
+    return 0
+  fi
+
   pkg_refresh_index --reason "extrepo installation"
   pkg_install "$EXTREPO_PACKAGE"
 }
 
-post_install() {
-  if command -v extrepo >/dev/null 2>&1; then
-    success "extrepo command is available."
-  else
-    warn "extrepo command not found in PATH after installation."
-  fi
+run_service_config() { :; }
+
+post_install_verify() {
+  verify_section "Post-install verification"
+  verify_command "extrepo --version" extrepo --version || true
 }
+
+final_summary() { success "Extrepo installation workflow finished."; }
 
 main() {
   run_install_workflow \
     "Extrepo installation" \
     "Proceed with extrepo installation?" \
-    show_preinstall_message \
-    run_checks \
-    run_install \
-    post_install
+    show_message run_prereq_checks check_already_installed check_conflicts show_install_plan run_install run_service_config post_install_verify final_summary
 }
 
 main "$@"

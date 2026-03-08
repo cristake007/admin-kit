@@ -21,32 +21,17 @@ NODE_SELECTED_TRACK="$NODE_TRACK_DEFAULT"
 NODE_SKIP_INSTALL=0
 
 node_current_major() {
-  if ! command -v node >/dev/null 2>&1; then
-    return 1
-  fi
-
+  command -v node >/dev/null 2>&1 || return 1
   local version raw_major
   version="$(node -v 2>/dev/null || true)"
   raw_major="${version#v}"
   raw_major="${raw_major%%.*}"
-
-  if [[ "$raw_major" =~ ^[0-9]+$ ]]; then
-    printf '%s\n' "$raw_major"
-    return 0
-  fi
-
-  return 1
+  [[ "$raw_major" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "$raw_major"
 }
 
-show_preinstall_message() {
-  info "This action will install Node.js using distro packages or an optional NodeSource track."
-  info "Prerequisites: root privileges, network access, and package repository connectivity."
-  info "- Default track: install distro package versions (recommended for maximum distro compatibility)."
-  if [[ "$OS_FAMILY" == "debian" || "$OS_FAMILY" == "rhel" ]]; then
-    info "- Major track: install a selected Node.js major (18/20/22) from NodeSource repository."
-  else
-    info "- Major track: not available on this distro family ($OS_FAMILY)."
-  fi
+show_message() {
+  info "This action will install Node.js using distro packages or an optional NodeSource major track."
 }
 
 choose_track() {
@@ -66,86 +51,59 @@ choose_track() {
       2) selected_track="18" ;;
       3) selected_track="20" ;;
       4) selected_track="22" ;;
-      *)
-        error "Invalid selection: ${choice}."
-        return 1
-        ;;
+      *) error "Invalid selection: ${choice}."; return 1 ;;
     esac
-  else
-    info "Using distro default track because NodeSource major tracks are not supported on this distro family."
   fi
 
   printf '%s\n' "$selected_track"
 }
 
-track_is_supported() {
-  local selected_track="${1:?track required}"
+run_prereq_checks() {
+  need_root
+  os_detect
+  os_require_supported
+  NODE_SELECTED_TRACK="$(choose_track)"
 
-  if [[ "$selected_track" == "$NODE_TRACK_DEFAULT" ]]; then
-    return 0
-  fi
-
-  if [[ "$OS_FAMILY" == "debian" || "$OS_FAMILY" == "rhel" ]]; then
-    return 0
-  fi
-
-  error "Selected Node.js major track ($selected_track) is unsupported on distro family '$OS_FAMILY'. Use the distro default track on this system."
-  return 1
-}
-
-selected_track_satisfied() {
-  local selected_track="${1:?track required}"
-  local current_major
-
-  current_major="$(node_current_major || true)"
-  if [[ -z "$current_major" ]]; then
+  if [[ "$NODE_SELECTED_TRACK" != "$NODE_TRACK_DEFAULT" && "$OS_FAMILY" != "debian" && "$OS_FAMILY" != "rhel" ]]; then
+    error "Selected Node.js major track ($NODE_SELECTED_TRACK) is unsupported on distro family '$OS_FAMILY'."
     return 1
   fi
+}
 
-  if [[ "$selected_track" == "$NODE_TRACK_DEFAULT" ]]; then
-    info "Node.js is already installed (major $current_major)."
-    return 0
+check_already_installed() {
+  local current_major
+  current_major="$(node_current_major || true)"
+  [[ -n "$current_major" ]] || return 0
+
+  if [[ "$NODE_SELECTED_TRACK" == "$NODE_TRACK_DEFAULT" || "$current_major" == "$NODE_SELECTED_TRACK" ]]; then
+    NODE_SKIP_INSTALL=1
+    info "Node.js target already satisfied (major ${current_major})."
   fi
+}
 
-  if [[ "$current_major" == "$selected_track" ]]; then
-    info "Installed Node.js major ($current_major) already matches selected target ($selected_track)."
-    return 0
+check_conflicts() { :; }
+
+show_install_plan() {
+  if [[ "$NODE_SELECTED_TRACK" == "$NODE_TRACK_DEFAULT" ]]; then
+    verify_item "track" "distro default"
+    verify_item "packages" "nodejs npm"
+  else
+    verify_item "track" "NodeSource $NODE_SELECTED_TRACK.x"
+    verify_item "package" "nodejs"
   fi
-
-  return 1
 }
 
 configure_nodesource_repo() {
   local selected_major="${1:?major required}"
   local setup_script="/tmp/nodesource_setup_${selected_major}.sh"
-
-  info "Configuring NodeSource repository for Node.js ${selected_major}.x"
   curl -fsSL "https://deb.nodesource.com/setup_${selected_major}.x" -o "$setup_script"
   bash "$setup_script"
   rm -f "$setup_script"
 }
 
-run_checks() {
-  need_root
-  os_detect
-  os_require_supported
-
-  NODE_SELECTED_TRACK="$(choose_track)"
-  track_is_supported "$NODE_SELECTED_TRACK"
-
-  if selected_track_satisfied "$NODE_SELECTED_TRACK"; then
-    success "No installation changes required."
-    verify_section "Node.js toolchain"
-    verify_command "node -v" node -v || true
-    verify_command "npm -v" npm -v || true
-    NODE_SKIP_INSTALL=1
-    return 0
-  fi
-}
-
 run_install() {
   if [[ "$NODE_SKIP_INSTALL" -eq 1 ]]; then
-    info "Skipping Node.js install stage; target already satisfied."
+    info "Skipping installation; target already satisfied."
     return 0
   fi
 
@@ -161,20 +119,21 @@ run_install() {
   pkg_install nodejs
 }
 
-post_install() {
-  verify_section "Node.js toolchain"
+run_service_config() { :; }
+
+post_install_verify() {
+  verify_section "Post-install verification"
   verify_command "node -v" node -v || true
   verify_command "npm -v" npm -v || true
 }
+
+final_summary() { success "Node.js installation workflow finished."; }
 
 main() {
   run_install_workflow \
     "Node.js installation" \
     "Proceed with Node.js installation?" \
-    show_preinstall_message \
-    run_checks \
-    run_install \
-    post_install
+    show_message run_prereq_checks check_already_installed check_conflicts show_install_plan run_install run_service_config post_install_verify final_summary
 }
 
 main "$@"
