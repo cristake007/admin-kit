@@ -36,7 +36,7 @@ main() {
     return 0
   fi
 
-  pkg_update_index
+  pkg_refresh_index --reason "php installation"
   pkg_install "${packages[@]}"
   success "PHP packages installed."
 }

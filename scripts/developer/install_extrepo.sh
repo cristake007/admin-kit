@@ -34,7 +34,7 @@ main() {
     return 0
   fi
 
-  pkg_update_index
+  pkg_refresh_index --reason "extrepo installation"
   pkg_install extrepo
   success "Extrepo installed."
 }

@@ -175,7 +175,7 @@ main() {
     return 0
   fi
 
-  pkg_update_index
+  pkg_refresh_index --reason "mariadb installation"
   pkg_install "$pkg_name"
   service_enable_now "$svc_name"
   harden_mariadb_if_requested "$harden_mode"

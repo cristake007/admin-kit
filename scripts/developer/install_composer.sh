@@ -97,7 +97,7 @@ selected_method_satisfied() {
 }
 
 install_via_distro_package() {
-  pkg_update_index
+  pkg_refresh_index --reason "composer distro installation"
   pkg_install composer
 }
 

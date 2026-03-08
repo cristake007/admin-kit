@@ -42,7 +42,7 @@ main() {
     return 0
   fi
 
-  pkg_update_index
+  pkg_refresh_index --reason "apache installation"
   pkg_install "$apache_pkg"
   service_enable_now "$apache_service"
   success "Apache installed and enabled ($apache_service)."

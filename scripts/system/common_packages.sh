@@ -67,7 +67,7 @@ main() {
     return 0
   fi
 
-  pkg_update_index
+  pkg_refresh_index --reason "common package installation ($profile profile)"
   pkg_install "${packages[@]}"
   success "Installed package profile: $profile"
 }

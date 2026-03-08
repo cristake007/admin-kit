@@ -32,7 +32,7 @@ main() {
     return 0
   fi
 
-  pkg_update_index
+  pkg_refresh_index --reason "fail2ban installation"
   pkg_install fail2ban
   service_enable_now fail2ban
   success "Fail2ban installation completed."

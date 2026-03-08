@@ -16,6 +16,23 @@ No additional standalone CLI entrypoints are supported.
 - OS/distro differences are handled in `lib/os.sh` through capability resolvers (`os_resolve_pkg`, `os_resolve_service`) and backend detection.
 - Package and service operations are centralized in `lib/pkg.sh` and `lib/service.sh`.
 
+## Package index refresh policy
+
+Package metadata refresh is centralized through `pkg_refresh_index` in `lib/pkg.sh` (installers no longer call `pkg_update_index` directly).
+
+- Default mode is `auto`: refresh only when cached metadata is stale (default threshold: 60 minutes).
+- `prompt` mode asks for confirmation before refreshing (for interactive workflows).
+- `always` mode forces refresh (used for explicit cases such as full system upgrades or after adding a new repository).
+- `never` mode skips refresh intentionally.
+
+Each refresh decision is logged before execution, and the last refresh timestamp is persisted to avoid redundant refreshes in chained workflows (for example `scripts/custom/ilias.sh`).
+
+You can override behavior with environment variables:
+
+- `PKG_REFRESH_MODE` (`auto|always|never|prompt`)
+- `PKG_REFRESH_STALE_MINUTES_DEFAULT` (minutes)
+- `PKG_REFRESH_STATE_FILE` (timestamp file path, default `/var/cache/admin-kit/pkg-index-refresh.timestamp`)
+
 ## Menu dispatch map
 
 The menu is generated from one authoritative dispatch table in `admin_menu.sh`.

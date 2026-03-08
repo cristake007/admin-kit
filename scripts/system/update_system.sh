@@ -32,7 +32,7 @@ main() {
   fi
 
   info "Updating package index..."
-  pkg_update_index
+  pkg_refresh_index --mode always --reason "system upgrade"
 
   info "Upgrading installed packages..."
   pkg_upgrade_system

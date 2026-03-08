@@ -42,7 +42,7 @@ main() {
     return 0
   fi
 
-  pkg_update_index
+  pkg_refresh_index --reason "postgresql installation"
   pkg_install "$pkg_name"
   service_enable_now "$svc_name"
   db_print_install_summary "postgresql" "$svc_name"

@@ -40,7 +40,7 @@ main() {
     return 0
   fi
 
-  pkg_update_index
+  pkg_refresh_index --reason "nginx installation"
   pkg_install nginx
   service_enable_now nginx
   success "Nginx installed and enabled."
