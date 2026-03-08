@@ -12,6 +12,13 @@ require_lib log
 require_lib core
 require_lib os
 require_lib pkg
+require_lib ui
+
+show_preinstall_message() {
+  info "This action will install PHP runtime packages and common extensions."
+  info "Prerequisites: root privileges and package repository access."
+  info "Key side effects: PHP packages will be installed."
+}
 
 main() {
   need_root
@@ -22,6 +29,12 @@ main() {
   local -a packages=()
   packages_raw="$(os_resolve_pkg php_runtime_bundle)"
   read -r -a packages <<<"$packages_raw"
+
+  show_preinstall_message
+  if ! confirm_proceed; then
+    operator_aborted
+    return 0
+  fi
 
   pkg_update_index
   pkg_install "${packages[@]}"

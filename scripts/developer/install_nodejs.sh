@@ -34,7 +34,8 @@ node_current_major() {
 }
 
 show_preinstall_message() {
-  info "Node.js installation plan"
+  info "This action will install Node.js using distro packages or an optional NodeSource track."
+  info "Prerequisites: root privileges, network access, and package repository connectivity."
   info "- Default track: install distro package versions (recommended for maximum distro compatibility)."
   if [[ "$OS_FAMILY" == "debian" || "$OS_FAMILY" == "rhel" ]]; then
     info "- Major track: install a selected Node.js major (18/20/22) from NodeSource repository."
@@ -172,8 +173,8 @@ main() {
     action_desc="Install Node.js major ${selected_track}.x from NodeSource"
   fi
 
-  if ! confirm "${action_desc}. Continue?"; then
-    warn "Installation cancelled by operator."
+  if ! confirm_proceed "${action_desc}. Proceed?"; then
+    operator_aborted
     print_verification_summary
     return 0
   fi

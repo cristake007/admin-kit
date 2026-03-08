@@ -12,6 +12,13 @@ require_lib log
 require_lib os
 require_lib pkg
 require_lib core
+require_lib ui
+
+show_preinstall_message() {
+  info "This action will install certbot and, when detected, the Apache or Nginx plugin package."
+  info "Prerequisites: root privileges and package repository access."
+  info "Key side effects: certbot packages will be installed."
+}
 
 main() {
   need_root
@@ -32,6 +39,12 @@ main() {
     plugin_pkg="python3-certbot-apache"
   elif pkg_is_installed nginx; then
     plugin_pkg="python3-certbot-nginx"
+  fi
+
+  show_preinstall_message
+  if ! confirm_proceed; then
+    operator_aborted
+    return 0
   fi
 
   pkg_update_index

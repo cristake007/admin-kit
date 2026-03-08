@@ -13,6 +13,13 @@ require_lib os
 require_lib pkg
 require_lib service
 require_lib core
+require_lib ui
+
+show_preinstall_message() {
+  info "This action will install Nginx and enable its service at boot."
+  info "Prerequisites: root privileges and package repository access."
+  info "Key side effects: nginx package installation and service activation."
+}
 
 main() {
   need_root
@@ -25,6 +32,12 @@ main() {
   if service_exists "$apache_service" && service_is_active "$apache_service"; then
     error "Apache is active. Stop $apache_service before installing Nginx to avoid port conflicts."
     return 1
+  fi
+
+  show_preinstall_message
+  if ! confirm_proceed; then
+    operator_aborted
+    return 0
   fi
 
   pkg_update_index

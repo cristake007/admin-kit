@@ -11,6 +11,14 @@ source "$THIS_DIR/../bootstrap.sh"
 require_lib log
 require_lib core
 require_lib validate
+require_lib ui
+
+show_preinstall_message() {
+  local username_hint="${1:-<prompted>}"
+  info "This action will create a local user and add it to sudo/wheel when available."
+  info "Prerequisites: root privileges and a valid new username."
+  info "Key side effects: /etc/passwd and group membership may be changed for $username_hint."
+}
 
 main() {
   need_root
@@ -20,9 +28,16 @@ main() {
     read -r -p "Enter username to create: " username
   fi
 
+  show_preinstall_message "$username"
+
   if ! validate_username "$username"; then
     error "Invalid username format."
     return 1
+  fi
+
+  if ! confirm_proceed; then
+    operator_aborted
+    return 0
   fi
 
   if id "$username" >/dev/null 2>&1; then

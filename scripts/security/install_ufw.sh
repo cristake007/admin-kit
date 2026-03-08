@@ -13,6 +13,7 @@ require_lib os
 require_lib pkg
 require_lib service
 require_lib core
+require_lib ui
 
 ufw_rule_exists() {
   local rule_label="${1:?rule label required}"
@@ -62,6 +63,12 @@ configure_ufw_additively() {
   fi
 }
 
+show_preinstall_message() {
+  info "This action will install the distro firewall tool and apply additive baseline rules."
+  info "Prerequisites: root privileges and package repository access."
+  info "Key side effects: firewall defaults/rules may change and firewall service may be enabled."
+}
+
 main() {
   need_root
   os_detect
@@ -72,6 +79,12 @@ main() {
     error "No supported firewall package for distro family: $OS_FAMILY"
     return 1
   }
+
+  show_preinstall_message
+  if ! confirm_proceed; then
+    operator_aborted
+    return 0
+  fi
 
   pkg_update_index
   pkg_install "$firewall_pkg"

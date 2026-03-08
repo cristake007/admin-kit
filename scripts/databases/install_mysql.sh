@@ -16,6 +16,12 @@ require_lib core
 require_lib db
 require_lib ui
 
+show_preinstall_message() {
+  info "This action will install MySQL server packages and enable/start the MySQL service."
+  info "Prerequisites: root privileges and package repository access."
+  info "Key side effects: database packages and service state will change."
+}
+
 main() {
   need_root
   os_detect
@@ -36,14 +42,12 @@ main() {
 
   if db_detect_conflicts "mysql"; then
     db_print_conflict_risk "mysql"
-    if [[ ! -t 0 ]]; then
-      error "Database conflict confirmation requires an interactive terminal. Aborting safely."
-      return 1
-    fi
-    if ! confirm "Proceed with MySQL installation despite coexistence risk?"; then
-      warn "MySQL installation aborted by operator choice."
-      return 1
-    fi
+  fi
+
+  show_preinstall_message
+  if ! confirm_proceed; then
+    operator_aborted
+    return 0
   fi
 
   pkg_update_index

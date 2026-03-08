@@ -13,6 +13,13 @@ require_lib os
 require_lib pkg
 require_lib service
 require_lib core
+require_lib ui
+
+show_preinstall_message() {
+  info "This action will install Apache HTTP server and enable its service at boot."
+  info "Prerequisites: root privileges and package repository access."
+  info "Key side effects: apache package installation and service activation."
+}
 
 main() {
   need_root
@@ -28,6 +35,12 @@ main() {
   local apache_service
   apache_pkg="$(os_resolve_pkg apache_server)"
   apache_service="$(os_resolve_service apache)"
+
+  show_preinstall_message
+  if ! confirm_proceed; then
+    operator_aborted
+    return 0
+  fi
 
   pkg_update_index
   pkg_install "$apache_pkg"

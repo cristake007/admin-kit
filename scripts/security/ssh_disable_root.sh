@@ -13,6 +13,13 @@ require_lib core
 require_lib file
 require_lib os
 require_lib service
+require_lib ui
+
+show_preinstall_message() {
+  info "This action will set PermitRootLogin no in /etc/ssh/sshd_config."
+  info "Prerequisites: root privileges and an installed sshd service."
+  info "Key side effects: sshd config is backed up, edited, validated, and service may restart."
+}
 
 main() {
   need_root
@@ -22,6 +29,12 @@ main() {
   if [[ ! -f "$cfg" ]]; then
     error "SSH config not found: $cfg"
     return 1
+  fi
+
+  show_preinstall_message
+  if ! confirm_proceed; then
+    operator_aborted
+    return 0
   fi
 
   backup_file "$cfg"

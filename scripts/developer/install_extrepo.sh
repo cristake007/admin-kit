@@ -12,6 +12,13 @@ require_lib log
 require_lib core
 require_lib os
 require_lib pkg
+require_lib ui
+
+show_preinstall_message() {
+  info "This action will install the extrepo package."
+  info "Prerequisites: root privileges on Debian/Ubuntu with package repository access."
+  info "Key side effects: extrepo package will be installed."
+}
 
 main() {
   need_root
@@ -19,6 +26,12 @@ main() {
   if [[ "$OS_FAMILY" != "debian" ]]; then
     error "Extrepo is supported only on Debian/Ubuntu systems."
     return 1
+  fi
+
+  show_preinstall_message
+  if ! confirm_proceed; then
+    operator_aborted
+    return 0
   fi
 
   pkg_update_index

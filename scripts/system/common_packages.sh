@@ -12,6 +12,7 @@ require_lib log
 require_lib os
 require_lib pkg
 require_lib core
+require_lib ui
 
 bundle_to_array() {
   local capability="${1:?capability required}"
@@ -20,6 +21,13 @@ bundle_to_array() {
 
   local -n out_ref="${2:?output array name required}"
   read -r -a out_ref <<<"$raw"
+}
+
+show_preinstall_message() {
+  local profile="${1:-baseline}"
+  info "This action will install the package profile: $profile."
+  info "Prerequisites: root privileges and package repository access."
+  info "Key side effects: additional system packages will be installed."
 }
 
 main() {
@@ -33,6 +41,8 @@ main() {
   local -a ilias_packages=()
 
   bundle_to_array common_baseline_bundle baseline_packages
+
+  show_preinstall_message "$profile"
 
   case "$profile" in
     baseline)
@@ -51,6 +61,11 @@ main() {
       return 1
       ;;
   esac
+
+  if ! confirm_proceed; then
+    operator_aborted
+    return 0
+  fi
 
   pkg_update_index
   pkg_install "${packages[@]}"
