@@ -1,21 +1,34 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck disable=SC1091
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
+require "lib/log.sh"
+require "lib/ui.sh"
+require "lib/core.sh"
+require "lib/pkg.sh"
+trap err_trap ERR
 
 need_sudo || exit 1
 
 main() {
-  read -r -p "Enter Node.js version (e.g., 18, 20) [20]: " NODE_VERSION
-  NODE_VERSION="${NODE_VERSION:-20}"
+  local node_version
+  echo_info "This installs Node.js from NodeSource."
+  read -r -p "Enter Node.js version (e.g., 18, 20) [20]: " node_version
+  node_version="${node_version:-20}"
 
-  echo_note "Installing Node.js ${NODE_VERSION}.x from NodeSource..."
+  confirm "Continue with Node.js ${node_version}.x installation?" || { echo_info "Cancelled."; exit 0; }
+
+  if command_exists node && node -v | grep -q "^v${node_version}"; then
+    echo_success "Node.js ${node_version}.x is already installed."
+    node -v
+    npm -v || true
+    exit 0
+  fi
+
   apt_update
   apt_install ca-certificates curl gnupg
-  curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | sudo -E bash -
+  curl -fsSL "https://deb.nodesource.com/setup_${node_version}.x" | sudo -E bash -
   apt_install nodejs
 
   echo_success "Node.js installed."
@@ -23,4 +36,4 @@ main() {
   npm -v || true
 }
 
-main
+main "$@"
