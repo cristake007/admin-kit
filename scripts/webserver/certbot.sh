@@ -13,6 +13,10 @@ require_lib os
 require_lib pkg
 require_lib core
 require_lib ui
+require_lib install
+
+CERTBOT_PACKAGE="certbot"
+CERTBOT_PLUGIN_PACKAGE=""
 
 show_preinstall_message() {
   info "This action will install certbot and, when detected, the Apache or Nginx plugin package."
@@ -20,7 +24,7 @@ show_preinstall_message() {
   info "Key side effects: certbot packages will be installed."
 }
 
-main() {
+run_checks() {
   need_root
   os_detect
   os_require_supported
@@ -30,32 +34,41 @@ main() {
     return 1
   fi
 
-  local certbot_pkg="certbot"
-  local plugin_pkg=""
   local apache_pkg
   apache_pkg="$(os_resolve_pkg apache_server)"
 
+  CERTBOT_PLUGIN_PACKAGE=""
   if pkg_is_installed "$apache_pkg"; then
-    plugin_pkg="python3-certbot-apache"
+    CERTBOT_PLUGIN_PACKAGE="python3-certbot-apache"
   elif pkg_is_installed nginx; then
-    plugin_pkg="python3-certbot-nginx"
+    CERTBOT_PLUGIN_PACKAGE="python3-certbot-nginx"
   fi
+}
 
-  show_preinstall_message
-  if ! confirm_proceed; then
-    operator_aborted
-    return 0
-  fi
-
+run_install() {
   pkg_refresh_index --reason "certbot installation"
-  pkg_install "$certbot_pkg"
-  if [[ -n "$plugin_pkg" ]]; then
-    pkg_install "$plugin_pkg"
+  pkg_install "$CERTBOT_PACKAGE"
+  if [[ -n "$CERTBOT_PLUGIN_PACKAGE" ]]; then
+    pkg_install "$CERTBOT_PLUGIN_PACKAGE"
   else
     warn "No Apache/Nginx package detected; installed certbot only."
   fi
+}
 
-  success "Certbot installation completed."
+post_install() {
+  if [[ -n "$CERTBOT_PLUGIN_PACKAGE" ]]; then
+    success "Certbot plugin installed: $CERTBOT_PLUGIN_PACKAGE"
+  fi
+}
+
+main() {
+  run_install_workflow \
+    "Certbot installation" \
+    "Proceed with certbot installation?" \
+    show_preinstall_message \
+    run_checks \
+    run_install \
+    post_install
 }
 
 main "$@"

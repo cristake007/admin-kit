@@ -13,6 +13,10 @@ require_lib os
 require_lib pkg
 require_lib core
 require_lib ui
+require_lib install
+
+COMMON_PROFILE="baseline"
+declare -a COMMON_PACKAGES=()
 
 bundle_to_array() {
   local capability="${1:?capability required}"
@@ -24,52 +28,59 @@ bundle_to_array() {
 }
 
 show_preinstall_message() {
-  local profile="${1:-baseline}"
-  info "This action will install the package profile: $profile."
+  info "This action will install the package profile: $COMMON_PROFILE."
   info "Prerequisites: root privileges and package repository access."
   info "Key side effects: additional system packages will be installed."
 }
 
-main() {
+run_checks() {
   need_root
   os_detect
   os_require_supported
 
-  local profile="${1:-baseline}"
-  local -a packages=()
   local -a baseline_packages=()
   local -a ilias_packages=()
 
   bundle_to_array common_baseline_bundle baseline_packages
 
-  show_preinstall_message "$profile"
-
-  case "$profile" in
+  case "$COMMON_PROFILE" in
     baseline)
-      packages=("${baseline_packages[@]}")
+      COMMON_PACKAGES=("${baseline_packages[@]}")
       ;;
     ilias)
       if ! bundle_to_array ilias_required_bundle ilias_packages; then
         error "ILIAS package profile is unsupported on distro family: $OS_FAMILY"
         return 1
       fi
-      packages=("${baseline_packages[@]}" "${ilias_packages[@]}")
+      COMMON_PACKAGES=("${baseline_packages[@]}" "${ilias_packages[@]}")
       ;;
     *)
-      error "Unknown package profile: $profile"
+      error "Unknown package profile: $COMMON_PROFILE"
       error "Usage: $0 [baseline|ilias]"
       return 1
       ;;
   esac
+}
 
-  if ! confirm_proceed; then
-    operator_aborted
-    return 0
-  fi
+run_install() {
+  pkg_refresh_index --reason "common package installation ($COMMON_PROFILE profile)"
+  pkg_install "${COMMON_PACKAGES[@]}"
+}
 
-  pkg_refresh_index --reason "common package installation ($profile profile)"
-  pkg_install "${packages[@]}"
-  success "Installed package profile: $profile"
+post_install() {
+  success "Installed package profile: $COMMON_PROFILE"
+}
+
+main() {
+  COMMON_PROFILE="${1:-baseline}"
+
+  run_install_workflow \
+    "Common packages installation" \
+    "Proceed with common package profile '$COMMON_PROFILE'?" \
+    show_preinstall_message \
+    run_checks \
+    run_install \
+    post_install
 }
 
 main "$@"
