@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
@@ -8,21 +8,49 @@ require "functions/functions.sh"
 
 need_sudo || exit 1
 
+print_symfony_version() {
+  local version
+  version="$(symfony version 2>/dev/null | head -n1 || true)"
+  if [[ -z "$version" ]]; then
+    version="$(symfony -V 2>/dev/null | head -n1 || true)"
+  fi
 
-
-main {
-
-    # install_symfony_cli.sh
-    # Installs Symfony CLI on Debian/Ubuntu systems (idempotent).
-
-    if command -v symfony >/dev/null 2>&1; then
-        ok "Symfony CLI is already installed: $(symfony -V | head -n1)"
-    else
-        note "Installing Symfony CLI..."
-        curl -1sLf 'https://dl.cloudsmith.io/public/symfony/stable/setup.deb.sh' | sudo -E bash || die "Failed to add Symfony repo"
-        sudo apt update -y
-        sudo apt install -y symfony-cli || die "Symfony CLI installation failed"
-        ok "Symfony CLI installed successfully: $(symfony -V | head -n1)"
-    fi
-
+  if [[ -n "$version" ]]; then
+    echo_note "$version"
+  fi
 }
+
+install_symfony_cli() {
+  if command -v symfony >/dev/null 2>&1; then
+    echo_success "Symfony CLI is already installed."
+    print_symfony_version
+    return 0
+  fi
+
+  echo_note "Installing Symfony CLI..."
+
+  apt_update
+  apt_install ca-certificates curl
+
+  if ! curl -1sLf 'https://dl.cloudsmith.io/public/symfony/stable/setup.deb.sh' | sudo -E bash; then
+    echo_error "Failed to configure Symfony repository."
+    return 1
+  fi
+
+  apt_update
+  apt_install symfony-cli
+
+  if ! command -v symfony >/dev/null 2>&1; then
+    echo_error "Symfony CLI installation completed but 'symfony' is not available on PATH."
+    return 1
+  fi
+
+  echo_success "Symfony CLI installed successfully."
+  print_symfony_version
+}
+
+main() {
+  install_symfony_cli
+}
+
+main "$@"
