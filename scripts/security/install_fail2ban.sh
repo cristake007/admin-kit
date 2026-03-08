@@ -14,6 +14,7 @@ require_lib pkg
 require_lib service
 require_lib core
 require_lib ui
+require_lib verify
 
 show_preinstall_message() {
   info "This action will install fail2ban and enable its service."
@@ -36,6 +37,8 @@ main() {
   pkg_install fail2ban
   service_enable_now fail2ban
   success "Fail2ban installation completed."
+  verify_section "Service status"
+  verify_systemd_service fail2ban || true
 }
 
 main "$@"

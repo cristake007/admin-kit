@@ -13,6 +13,7 @@ require_lib core
 require_lib os
 require_lib pkg
 require_lib ui
+require_lib verify
 
 NODE_TRACK_DEFAULT="default"
 node_current_major() {
@@ -136,19 +137,9 @@ install_selected_track() {
 }
 
 print_verification_summary() {
-  printf '\nVerification summary:\n'
-  if command -v node >/dev/null 2>&1; then
-    printf '  node -v: %s\n' "$(node -v 2>/dev/null || echo 'command failed')"
-  else
-    printf '  node -v: not available\n'
-  fi
-
-  if command -v npm >/dev/null 2>&1; then
-    printf '  npm -v: %s\n' "$(npm -v 2>/dev/null || echo 'command failed')"
-  else
-    printf '  npm -v: not available\n'
-    printf '  note: npm is unavailable on this system after installation.\n'
-  fi
+  verify_section "Node.js toolchain"
+  verify_command "node -v" node -v || true
+  verify_command "npm -v" npm -v || true
 }
 
 main() {

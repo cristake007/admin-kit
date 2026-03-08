@@ -13,6 +13,7 @@ require_lib core
 require_lib validate
 require_lib file
 require_lib ui
+require_lib verify
 
 show_preinstall_message() {
   local target_fqdn="${1:?fqdn required}"
@@ -113,8 +114,9 @@ main() {
   effective_fqdn="$(hostnamectl --fqdn 2>/dev/null || true)"
 
   success "Hostname configuration finished."
-  info "Verification: hostnamectl --static => ${effective_static:-<empty>}"
-  info "Verification: hostnamectl --fqdn   => ${effective_fqdn:-<empty>}"
+  verify_section "Effective settings"
+  verify_item "hostnamectl --static" "${effective_static:-<empty>}"
+  verify_item "hostnamectl --fqdn" "${effective_fqdn:-<empty>}"
 }
 
 main "$@"

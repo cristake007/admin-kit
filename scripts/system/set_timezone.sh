@@ -11,6 +11,7 @@ source "$THIS_DIR/../bootstrap.sh"
 require_lib log
 require_lib core
 require_lib ui
+require_lib verify
 
 current_timezone() {
   timedatectl show --property=Timezone --value
@@ -70,7 +71,8 @@ main() {
 
   if [[ "$existing_timezone" == "$requested_timezone" ]]; then
     info "Timezone is already set to $requested_timezone; no change needed."
-    info "Current timezone: $existing_timezone"
+    verify_section "Effective settings"
+    verify_item "timezone" "${existing_timezone:-<empty>}"
     return 0
   fi
 
@@ -88,7 +90,8 @@ main() {
   local applied_timezone=""
   applied_timezone="$(current_timezone)"
   success "Timezone update completed."
-  info "Verification: timedatectl reports timezone as '$applied_timezone'."
+  verify_section "Effective settings"
+  verify_item "timezone" "${applied_timezone:-<empty>}"
 }
 
 main "$@"

@@ -14,6 +14,7 @@ require_lib pkg
 require_lib service
 require_lib core
 require_lib ui
+require_lib verify
 
 show_preinstall_message() {
   info "This action will install Nginx and enable its service at boot."
@@ -44,6 +45,8 @@ main() {
   pkg_install nginx
   service_enable_now nginx
   success "Nginx installed and enabled."
+  verify_section "Service status"
+  verify_systemd_service nginx || true
 }
 
 main "$@"

@@ -14,6 +14,7 @@ require_lib pkg
 require_lib service
 require_lib core
 require_lib ui
+require_lib verify
 
 ufw_rule_exists() {
   local rule_label="${1:?rule label required}"
@@ -96,6 +97,16 @@ main() {
   fi
 
   success "Firewall installation and reconciliation completed using $FIREWALL_BACKEND."
+  verify_section "Firewall status"
+  if [[ "$FIREWALL_BACKEND" == "ufw" ]]; then
+    if command -v ufw >/dev/null 2>&1; then
+      verify_item "ufw status" "$(ufw status | head -n1)"
+    else
+      verify_warning "ufw status" "command not found"
+    fi
+  else
+    verify_systemd_service "$(os_resolve_service firewall)" || true
+  fi
 }
 
 main "$@"

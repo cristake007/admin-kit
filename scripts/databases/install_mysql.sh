@@ -15,6 +15,7 @@ require_lib service
 require_lib core
 require_lib db
 require_lib ui
+require_lib verify
 
 show_preinstall_message() {
   info "This action will install MySQL server packages and enable/start the MySQL service."
@@ -54,6 +55,10 @@ main() {
   pkg_install "$pkg_name"
   service_enable_now "$svc_name"
   db_print_install_summary "mysql" "$svc_name"
+  verify_section "Version checks"
+  verify_command "mysql --version" mysql --version || true
+  verify_section "Service status"
+  verify_systemd_service "$svc_name" || true
   success "MySQL installation completed."
 }
 
