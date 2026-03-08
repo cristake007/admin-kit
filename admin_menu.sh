@@ -36,7 +36,7 @@ readonly -a MENU_ACTIONS=(
   "webserver|Install Apache|scripts/webserver/apache2.sh"
   "webserver|Install Nginx|scripts/webserver/nginx.sh"
   "webserver|Install Certbot|scripts/webserver/certbot.sh"
-  "databases|Install MariaDB|scripts/databases/install_mariadb.sh"
+  "databases|Install MariaDB (+ optional hardening)|scripts/databases/install_mariadb.sh"
   "databases|Install MySQL|scripts/databases/install_mysql.sh"
   "databases|Install PostgreSQL|scripts/databases/install_postgresql.sh"
   "security|Disable SSH root login|scripts/security/ssh_disable_root.sh"
