@@ -1,36 +1,27 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+# Purpose: Configure timezone.
+# Supports: linux with timedatectl
+# Requires: root privileges
+# Safe to rerun: yes
+# Side effects: timezone configuration
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-
-need_sudo || exit 1
+require_lib log
+require_lib core
 
 main() {
-  echo_info "This script will set the system's timezone."
-  echo_info "You can specify a timezone in the format 'Region/City', e.g., 'Europe/Bucharest'."
-  echo_info "If you leave it blank, the default 'Europe/Bucharest' will be used."
-  echo ""
+  need_root
+  local tz="${1:-Europe/Bucharest}"
 
-  if ! confirm "Do you want to continue?"; then
-    echo_info "Cancelled."; exit 0
+  if ! timedatectl list-timezones | grep -Fxq "$tz"; then
+    error "Unknown timezone: $tz"
+    return 1
   fi
 
-  read -r -p "Enter timezone [Europe/Bucharest]: " TZ_INPUT
-  TZ_INPUT="${TZ_INPUT:-Europe/Bucharest}"
-
-  echo_note "Setting timezone to ${TZ_INPUT}..."
-  if command -v timedatectl >/dev/null 2>&1; then
-    timedatectl set-timezone "${TZ_INPUT}"
-  else
-    apt_update
-    apt_install tzdata
-    echo "${TZ_INPUT}" >/etc/timezone
-    dpkg-reconfigure -f noninteractive tzdata
-  fi
-
-  echo_success "Timezone set to ${TZ_INPUT}."
+  timedatectl set-timezone "$tz"
+  success "Timezone set to $tz"
 }
 
-main
+main "$@"

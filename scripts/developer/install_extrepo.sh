@@ -1,35 +1,29 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+# Purpose: Install extrepo on Debian-family systems.
+# Supports: debian
+# Requires: root privileges
+# Safe to rerun: yes
+# Side effects: package installation
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-
-need_sudo || exit 1
-
-echo_info "This script installs the 'extrepo' package to manage external repositories."
-
-if confirm "Do you want to continue?"; then
-  echo_info "Proceeding with extrepo installation..."
-else
-  echo_info "Installation cancelled by user."
-  exit 0
-fi
+require_lib log
+require_lib core
+require_lib os
+require_lib pkg
 
 main() {
-  if apt_is_installed extrepo; then
-    echo_info "extrepo is already installed."
-  else
-    echo_note "Installing extrepo..."
-    apt_update
-    apt_install extrepo
-    echo_success "Extrepo installed."
+  need_root
+  os_detect
+  if [[ "$OS_FAMILY" != "debian" ]]; then
+    error "Extrepo is supported only on Debian/Ubuntu systems."
+    return 1
   fi
 
-  # Optional: show version if available
-  if command -v extrepo >/dev/null 2>&1; then
-    dpkg -s extrepo | awk -F': ' '/^Version:/ {printf "Extrepo %s %s\n", $1, $2}'
-  fi
+  pkg_update_index
+  pkg_install extrepo
+  success "Extrepo installed."
 }
 
-main
+main "$@"

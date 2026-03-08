@@ -1,48 +1,26 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+# Purpose: Install common command-line tools.
+# Supports: debian, rhel, suse, arch
+# Requires: root privileges
+# Safe to rerun: yes
+# Side effects: package installation
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-
-need_sudo || exit 1
-
-echo_info "This script installs common command-line tools: curl, wget, git, unzip, zip, ufw, ca-certificates, gnupg, acl."
-
-if confirm "Do you want to continue?"; then
-  echo_info "Proceeding with installation..."
-else
-  echo_info "Installation cancelled by user."
-  exit 0
-fi
+require_lib log
+require_lib core
+require_lib os
+require_lib pkg
 
 main() {
-  local pkgs=(curl wget git unzip zip ufw ca-certificates gnupg acl)
-  local missing=()
+  need_root
+  os_detect
+  os_require_supported
 
-  echo_info "This will install: ${pkgs[*]}"
-
-  # Collect missing packages
-  for p in "${pkgs[@]}"; do
-    if apt_is_installed "$p"; then
-      echo_note "$p is already installed."
-    else
-      missing+=("$p")
-    fi
-  done
-
-  if [[ ${#missing[@]} -eq 0 ]]; then
-    echo_success "All common tools are already installed."
-    return 0
-  fi
-
-  echo_note "Updating apt metadata..."
-  apt_update
-
-  echo_note "Installing missing packages: ${missing[*]}"
-  apt_install "${missing[@]}"
-
-  echo_success "Common tools installed successfully."
+  pkg_update_index
+  pkg_install curl wget git unzip zip ca-certificates gnupg
+  success "Common tools installed."
 }
 
-main
+main "$@"

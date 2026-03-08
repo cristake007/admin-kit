@@ -1,41 +1,36 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+# Purpose: Install and enable Nginx.
+# Supports: debian, rhel, suse, arch
+# Requires: root privileges
+# Safe to rerun: yes
+# Side effects: package install and service enablement
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-
-need_sudo || exit 1
+require_lib log
+require_lib os
+require_lib pkg
+require_lib service
+require_lib core
 
 main() {
-  echo_info "This will install Nginx."
-  echo_info "After installation, the Nginx service will be enabled and started."
-  echo_info "The script will first detect if Apache is installed, as both web servers conflict (bind to ports 80/443)."
-  echo ""
+  need_root
+  os_detect
+  os_require_supported
 
-  if ! confirm "Do you want to continue?"; then
-    echo_info "Cancelled."; exit 0
+  local apache_service="apache2"
+  [[ "$OS_FAMILY" != "debian" ]] && apache_service="httpd"
+
+  if service_exists "$apache_service" && service_is_active "$apache_service"; then
+    error "Apache is active. Stop $apache_service before installing Nginx to avoid port conflicts."
+    return 1
   fi
 
-  # Abort if nginx present (port 80/443 conflict)
-  if apt_is_installed apache2; then
-    echo_error "Apache is installed. Apache and Nginx both bind to 80/443 — exiting."
-    exit 1
-  fi
-
-  # If Apache already present, stop here (like apt would do on re-run)
-  if apt_is_installed nginx; then
-    echo_success "Nginx is already installed."
-  else
-    echo_note "Installing Nginx via APT..."
-    apt_update
-    apt_install nginx
-    echo_success "Nginx installed."
-  fi
-
-  # Show simple status (no changes)
-  echo_info "Service state: $(systemctl is-active nginx 2>/dev/null || echo inactive)"
-  echo_info "Enabled at boot: $(systemctl is-enabled nginx 2>/dev/null || echo unknown)"
+  pkg_update_index
+  pkg_install nginx
+  service_enable_now nginx
+  success "Nginx installed and enabled."
 }
 
-main
+main "$@"

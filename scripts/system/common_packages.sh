@@ -1,37 +1,26 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+# Purpose: Install common baseline packages.
+# Supports: debian, rhel, suse, arch
+# Requires: root privileges
+# Safe to rerun: yes
+# Side effects: package installation
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-trap 'err_trap' ERR
-
-need_sudo || exit 1
+require_lib log
+require_lib os
+require_lib pkg
+require_lib core
 
 main() {
-  echo_info "Install minimal baseline packages (shared by most scripts)."
-  echo_info "Includes: ca-certificates, curl, gnupg, lsb-release"
-  echo
+  need_root
+  os_detect
+  os_require_supported
 
-  confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
-
-  local packages=(
-    ca-certificates
-    curl
-    gnupg
-    lsb-release
-  )
-
-  echo_note "Updating package index..."
-  apt_update
-
-  echo_note "Installing packages..."
-  local pkg
-  for pkg in "${packages[@]}"; do
-    apt_install "$pkg"
-  done
-
-  echo_success "Baseline packages installed successfully."
+  pkg_update_index
+  pkg_install ca-certificates curl gnupg
+  success "Common packages are installed."
 }
 
 main "$@"
