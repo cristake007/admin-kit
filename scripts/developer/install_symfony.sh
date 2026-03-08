@@ -1,28 +1,34 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck disable=SC1091
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
+require "lib/log.sh"
+require "lib/ui.sh"
+require "lib/core.sh"
+require "lib/pkg.sh"
+trap err_trap ERR
 
 need_sudo || exit 1
 
+main() {
+  echo_info "This installs Symfony CLI."
+  echo
 
+  confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
-main {
+  if command_exists symfony; then
+    echo_success "Symfony CLI already installed: $(symfony -V | head -n1)"
+    exit 0
+  fi
 
-    # install_symfony_cli.sh
-    # Installs Symfony CLI on Debian/Ubuntu systems (idempotent).
+  apt_update
+  apt_install ca-certificates curl gnupg
+  curl -1sLf 'https://dl.cloudsmith.io/public/symfony/stable/setup.deb.sh' | sudo -E bash
+  apt_update
+  apt_install symfony-cli
 
-    if command -v symfony >/dev/null 2>&1; then
-        ok "Symfony CLI is already installed: $(symfony -V | head -n1)"
-    else
-        note "Installing Symfony CLI..."
-        curl -1sLf 'https://dl.cloudsmith.io/public/symfony/stable/setup.deb.sh' | sudo -E bash || die "Failed to add Symfony repo"
-        sudo apt update -y
-        sudo apt install -y symfony-cli || die "Symfony CLI installation failed"
-        ok "Symfony CLI installed successfully: $(symfony -V | head -n1)"
-    fi
-
+  echo_success "Symfony CLI installed: $(symfony -V | head -n1)"
 }
+
+main "$@"

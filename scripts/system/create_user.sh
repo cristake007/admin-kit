@@ -1,40 +1,43 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
+require "lib/log.sh"
+require "lib/ui.sh"
+require "lib/core.sh"
+require "lib/validate.sh"
+trap err_trap ERR
 
 need_sudo || exit 1
 
 main() {
+  local username
   echo_info "This script will create a new user with sudo privileges."
-  echo_info "Usernames must start with a letter and can contain lowercase letters, digits, underscores, and hyphens. Maximum length is 32 characters."
-  echo ""
-  
-  if ! confirm "Do you want to continue?"; then
-    echo_info "Cancelled."; exit 0
-  fi
+  echo_info "Allowed format: starts with a letter; then lowercase letters, digits, '_' or '-'; max 32 chars."
+  echo
+
+  confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
   while true; do
     read -r -p "Enter a username to create: " username
-
-    # Validate: starts with letter; then lowercase letters/digits/_/-; max 32
-    if [[ "$username" =~ ^[a-z][-a-z0-9_]{0,31}$ ]]; then
-      if id "$username" &>/dev/null; then
-        echo_info "User '$username' already exists."
-      else
-        echo_note "Creating user '$username'..."
-        script -qec "sudo adduser \"$username\"" /dev/null
-        echo_note "Adding '$username' to 'sudo' group..."
-        sudo usermod -aG sudo "$username"
-        echo_success "User '$username' created and added to sudo group."
-      fi
-      break
-    else
-      echo_error "Invalid username. Use lowercase letters, digits, underscores; max 32 chars; start with a letter."
+    if ! validate_username "$username"; then
+      echo_error "Invalid username. Example: admin01"
+      continue
     fi
+
+    if user_exists "$username"; then
+      echo_info "User '$username' already exists."
+      break
+    fi
+
+    echo_note "Creating user '$username'..."
+    script -qec "sudo adduser \"$username\"" /dev/null
+    echo_note "Adding '$username' to 'sudo' group..."
+    sudo usermod -aG sudo "$username"
+    echo_success "User '$username' created and added to sudo group."
+    break
   done
 }
 
-main
+main "$@"

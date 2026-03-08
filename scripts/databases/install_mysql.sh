@@ -1,29 +1,28 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck disable=SC1091
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
+require "lib/log.sh"
+require "lib/ui.sh"
+require "lib/core.sh"
+require "lib/pkg.sh"
+require "lib/service.sh"
+trap err_trap ERR
 
 need_sudo || exit 1
 
-MYSQL_LIST="/etc/apt/sources.list.d/mysql.list"
-MYSQL_KEYRING="/usr/share/keyrings/mysql-apt.gpg"
-
 main() {
-  echo_info "This will install Oracle MySQL Server."
-  echo_info "After installation, the MySQL service will be enabled and started."
-  echo_info "The script will first detect if MariaDB is installed, as MySQL conflicts with MariaDB."
-  echo ""
+  echo_info "This installs Oracle MySQL Server."
+  echo_info "MySQL conflicts with MariaDB."
+  echo
 
-  if ! confirm "Do you want to continue?"; then
-    echo_info "Cancelled."; exit 0
-  fi
+  confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
   if apt_is_installed mysql-server || apt_is_installed mysql-community-server; then
     echo_success "MySQL is already installed."
-    sudo systemctl enable --now mysql
+    service_enable_now mysql
+    service_status_line mysql
     exit 0
   fi
 
@@ -31,7 +30,7 @@ main() {
     echo_error "MariaDB is already installed. MySQL conflicts with MariaDB."
     exit 1
   fi
-  
+
   apt_update
   if ! apt_install mysql-server; then
     add_mysql_repo
@@ -39,8 +38,9 @@ main() {
     apt_install mysql-server
   fi
 
-  sudo systemctl enable --now mysql
+  service_enable_now mysql
   echo_success "MySQL installed and started."
+  service_status_line mysql
 }
 
-main
+main "$@"
