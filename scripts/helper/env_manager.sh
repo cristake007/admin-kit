@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# scripts/helper/env_manager.sh
-# Environment (.env) manager — standalone, matches your UI helpers
+set -Eeuo pipefail
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck disable=SC1091
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
+require "lib/log.sh"
+require "lib/ui.sh"
+require "lib/core.sh"
+require "lib/env.sh"
+trap err_trap ERR
 
-: "${ENV_VARS_FILE:="$SCRIPT_DIR/.env"}"
+: "${ENV_VARS_FILE:=$PROJECT_ROOT/.env}"
 
 while true; do
   clear
@@ -32,60 +34,48 @@ while true; do
       ;;
     2)
       clear; display_header "List variables"
-      if [[ -f "$ENV_VARS_FILE" ]]; then
-        list_env_vars
-      else
-        echo_info "No env file yet. Choose option 1 to create it."
-      fi
+      list_env_vars
       pause
       ;;
     3)
       clear; display_header "Get a variable"
       read -r -p "Key: " k
-      if [[ -z "$k" ]]; then echo_error "Key cannot be empty."; pause; continue; fi
-      val="$(get_env_var "$k" || true)"
-      if [[ -n "$val" ]]; then
-        echo_success "$k=\"$val\""
+      if [[ -z "$k" ]]; then
+        echo_error "Key cannot be empty."
       else
-        echo_error "Variable not found: $k"
+        val="$(get_env_var "$k" || true)"
+        [[ -n "$val" ]] && echo_success "$k=\"$val\"" || echo_error "Variable not found: $k"
       fi
       pause
       ;;
     4)
       clear; display_header "Set/update variable(s)"
-      if [[ ! -f "$ENV_VARS_FILE" ]]; then
-        echo_info "No env file yet; creating…"
-        initialize_env_file || { echo_error "Could not create $ENV_VARS_FILE"; pause; continue; }
-      fi
+      initialize_env_file || { echo_error "Could not create $ENV_VARS_FILE"; pause; continue; }
       echo_info "Enter KEY=VALUE lines (blank line to finish)."
-      echo_info "Examples: DOMAIN=example.com   DB_PASS='s3cr3t'"
-      declare -a NAMES=()
+      declare -a names=()
       while IFS= read -r line; do
         [[ -z "$line" ]] && break
         if [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
-          key="${BASH_REMATCH[1]}"; val="${BASH_REMATCH[2]}"
+          key="${BASH_REMATCH[1]}"
+          val="${BASH_REMATCH[2]}"
           export "$key=$val"
-          NAMES+=("$key")
+          names+=("$key")
         else
           echo_error "Invalid format: $line"
         fi
       done
-      if ((${#NAMES[@]})); then
-        save_env_var "${NAMES[@]}" || echo_error "Failed to update one or more variables."
-      else
-        echo_info "No variables provided."
-      fi
+      ((${#names[@]})) && save_env_var "${names[@]}" || echo_info "No variables provided."
       pause
       ;;
     5)
       clear; display_header "Unset (delete) a variable"
       read -r -p "Key to remove: " k
-      if [[ -z "$k" ]]; then echo_error "Key cannot be empty."; pause; continue; fi
-      unset_env_var "$k"
+      [[ -z "$k" ]] && echo_error "Key cannot be empty." || unset_env_var "$k"
       pause
       ;;
     6)
       clear; display_header "Edit .env"
+      initialize_env_file || true
       "${EDITOR:-${VISUAL:-nano}}" "$ENV_VARS_FILE"
       pause
       ;;

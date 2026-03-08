@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-trap err_trap ERR
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# Bootstrap + functions
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/scripts/bootstrap.sh"
-require "functions/functions.sh"
+require "lib/log.sh"
+require "lib/ui.sh"
+require "lib/core.sh"
+trap err_trap ERR
 
-###################
-#      SYSTEM     #
-###################
 system_screen() {
   while true; do
     clear
@@ -26,36 +24,17 @@ system_screen() {
     read -r choice
 
     case "$choice" in
-      1)
-        clear
-        display_header "Update system"
-        run "$SCRIPT_DIR/scripts/system/update_system.sh" || echo_error "System update/upgrade failed."; pause;;
-      2)
-        clear
-        display_header "Create sudo user"
-        run "$SCRIPT_DIR/scripts/system/create_user.sh" || echo_error "User creation failed."; pause;;
-      3)
-        clear
-        display_header "Set timezone"
-        run "$SCRIPT_DIR/scripts/system/set_timezone.sh" || echo_error "Setting timzone failed."; pause;;
-      4)
-        clear
-        display_header "Set hostname"
-        run "$SCRIPT_DIR/scripts/system/set_hostname.sh" || echo_error "Setting hostname failed."; pause;;
-      5)
-        clear
-        display_header "Install common packages"
-        run "$SCRIPT_DIR/scripts/system/common_packages.sh" || echo_error "Installing common packages failed."; pause;;
+      1) clear; display_header "Update system"; run "$SCRIPT_DIR/scripts/system/update_system.sh" || echo_error "System update/upgrade failed."; pause ;;
+      2) clear; display_header "Create sudo user"; run "$SCRIPT_DIR/scripts/system/create_user.sh" || echo_error "User creation failed."; pause ;;
+      3) clear; display_header "Set timezone"; run "$SCRIPT_DIR/scripts/system/set_timezone.sh" || echo_error "Setting timezone failed."; pause ;;
+      4) clear; display_header "Set hostname"; run "$SCRIPT_DIR/scripts/system/set_hostname.sh" || echo_error "Setting hostname failed."; pause ;;
+      5) clear; display_header "Install common packages"; run "$SCRIPT_DIR/scripts/system/common_packages.sh" || echo_error "Installing common packages failed."; pause ;;
       0) return ;;
       *) echo_error "Invalid option. Please try again."; pause ;;
     esac
   done
 }
 
-
-###################
-#    WEBSERVER    #
-###################
 webserver_screen() {
   while true; do
     clear
@@ -69,28 +48,15 @@ webserver_screen() {
     read -r choice
 
     case "$choice" in
-      1)
-        clear
-        display_header "Install Apache2"
-        run "$SCRIPT_DIR/scripts/webserver/apache2.sh" || echo_error "Apache2 setup failed failed."; pause ;;
-      2)
-        clear
-        display_header "Install Nginx"
-        run "$SCRIPT_DIR/scripts/webserver/nginx.sh" || echo_error "Nginx install failed."; pause ;;
-      3)
-        clear
-        display_header "Install Certbot"
-        run "$SCRIPT_DIR/scripts/webserver/certbot.sh" || echo_error "Certbot install failed."; pause ;;
+      1) clear; display_header "Install Apache2"; run "$SCRIPT_DIR/scripts/webserver/apache2.sh" || echo_error "Apache2 setup failed."; pause ;;
+      2) clear; display_header "Install Nginx"; run "$SCRIPT_DIR/scripts/webserver/nginx.sh" || echo_error "Nginx install failed."; pause ;;
+      3) clear; display_header "Install Certbot"; run "$SCRIPT_DIR/scripts/webserver/certbot.sh" || echo_error "Certbot install failed."; pause ;;
       0) return ;;
       *) echo_error "Invalid option. Please try again."; pause ;;
     esac
   done
 }
 
-
-###################
-#    DATABASES    #
-###################
 databases_screen() {
   while true; do
     clear
@@ -104,60 +70,38 @@ databases_screen() {
     read -r choice
 
     case "$choice" in
-      1)
-        clear
-        display_header "Install MariaDB"
-        run "$SCRIPT_DIR/scripts/databases/install_mariadb.sh" || echo_error "MariaDB setup failed failed."; pause ;;
-      2)
-        clear
-        display_header "Install MySQL"
-        run "$SCRIPT_DIR/scripts/databases/install_mysql.sh" || echo_error "MySQL install failed."; pause ;;
-      3)
-        clear
-        display_header "Install PostgreSQL"
-        run "$SCRIPT_DIR/scripts/databases/install_postgresql.sh" || echo_error "PostgreSQL install failed."; pause ;;
+      1) clear; display_header "Install MariaDB"; run "$SCRIPT_DIR/scripts/databases/install_mariadb.sh" || echo_error "MariaDB setup failed."; pause ;;
+      2) clear; display_header "Install MySQL"; run "$SCRIPT_DIR/scripts/databases/install_mysql.sh" || echo_error "MySQL install failed."; pause ;;
+      3) clear; display_header "Install PostgreSQL"; run "$SCRIPT_DIR/scripts/databases/install_postgresql.sh" || echo_error "PostgreSQL install failed."; pause ;;
       0) return ;;
       *) echo_error "Invalid option. Please try again."; pause ;;
     esac
   done
 }
 
-
-###################
-#     SECURITY    #
-###################
 security_screen() {
   while true; do
     clear
     display_header "Security"
     echo_note "1) Disable root SSH login"
     echo_note "2) Install fail2ban"
-    echo_note "2) Install UFW"
+    echo_note "3) Install UFW"
     echo_note ""
     echo_note "0) Return to Main Menu"
     echo -ne "\n${YELLOW}Enter your choice:${NC} "
     read -r choice
 
     case "$choice" in
-      1)
-        clear
-        display_header "Disable root SSH login"
-        run "$SCRIPT_DIR/scripts/security/ssh_disable_root.sh" || echo_error "SSH root login config failed."; pause ;;
-      2)
-        clear
-        display_header "Install Fail2Ban"
-        run "$SCRIPT_DIR/scripts/security/install_fail2ban.sh" || echo_error "Fail2ban install failed."; pause ;;
-      3)
-        clear
-        display_header "Install UFW"
-        run "$SCRIPT_DIR/scripts/security/install_ufw.sh" || echo_error "UFW install failed."; pause ;;
+      1) clear; display_header "Disable root SSH login"; run "$SCRIPT_DIR/scripts/security/ssh_disable_root.sh" || echo_error "SSH root login config failed."; pause ;;
+      2) clear; display_header "Install Fail2Ban"; run "$SCRIPT_DIR/scripts/security/install_fail2ban.sh" || echo_error "Fail2ban install failed."; pause ;;
+      3) clear; display_header "Install UFW"; run "$SCRIPT_DIR/scripts/security/install_ufw.sh" || echo_error "UFW install failed."; pause ;;
       0) return ;;
       *) echo_error "Invalid option. Please try again."; pause ;;
     esac
   done
 }
 
-backups_screen(){
+backups_screen() {
   echo_error "Backup functionality is under development."
   while true; do
     clear
@@ -169,18 +113,14 @@ backups_screen(){
     read -r choice
 
     case "$choice" in
-      1)
-        clear
-        display_header "Backup script"
-        echo_info "This feature is under development."; pause ;;
-
+      1) clear; display_header "Backup script"; echo_info "This feature is under development."; pause ;;
       0) return ;;
       *) echo_error "Invalid option. Please try again."; pause ;;
     esac
   done
 }
 
-developer_screen(){
+developer_screen() {
   while true; do
     clear
     display_header "Developer tools"
@@ -195,37 +135,18 @@ developer_screen(){
     read -r choice
 
     case "$choice" in
-      1)
-        clear
-        display_header "Install EXTREPO"
-        run "$SCRIPT_DIR/scripts/developer/install_extrepo.sh" || echo_error "Extrepo install failed."; pause ;;
-      2)
-        clear
-        display_header "Install PHP and common extensions"
-        run "$SCRIPT_DIR/scripts/developer/install_php.sh" || echo_error "PHP install failed."; pause ;;
-      3)
-        clear
-        display_header "Composer (PHP dependency manager)"
-        run "$SCRIPT_DIR/scripts/developer/install_composer.sh" || echo_error "Composer install failed."; pause ;;
-      4)
-        clear
-        display_header "Install Node.js and npm"
-        run "$SCRIPT_DIR/scripts/developer/install_nodejs.sh" || echo_error "Node.js install failed."; pause ;;
-      5)
-        clear
-        display_header "Install Symfony-CLI"
-        run "$SCRIPT_DIR/scripts/developer/install_symfony.sh" || echo_error "Symfony install failed."; pause ;;
-      # 5)
-      #   clear
-      #   display_header "Install Python and pip"
-      #   run "$SCRIPT_DIR/scripts/helper/install_pypip.sh" || echo_error "Pyhton install failed."; pause;;
+      1) clear; display_header "Install EXTREPO"; run "$SCRIPT_DIR/scripts/developer/install_extrepo.sh" || echo_error "Extrepo install failed."; pause ;;
+      2) clear; display_header "Install PHP and common extensions"; run "$SCRIPT_DIR/scripts/developer/install_php.sh" || echo_error "PHP install failed."; pause ;;
+      3) clear; display_header "Composer (PHP dependency manager)"; run "$SCRIPT_DIR/scripts/developer/install_composer.sh" || echo_error "Composer install failed."; pause ;;
+      4) clear; display_header "Install Node.js and npm"; run "$SCRIPT_DIR/scripts/developer/install_nodejs.sh" || echo_error "Node.js install failed."; pause ;;
+      5) clear; display_header "Install Symfony-CLI"; run "$SCRIPT_DIR/scripts/developer/install_symfony.sh" || echo_error "Symfony install failed."; pause ;;
       0) return ;;
       *) echo_error "Invalid option. Please try again."; pause ;;
     esac
   done
 }
 
-custom_screen(){
+custom_screen() {
   while true; do
     clear
     display_header "Custom scripts"
@@ -236,19 +157,13 @@ custom_screen(){
     read -r choice
 
     case "$choice" in
-      1)
-        clear
-        display_header "Custom Quick Install ILIAS LMS"
-        run "$SCRIPT_DIR/scripts/custom/ilias.sh" || echo_error "Ilias install failed."; pause;;
+      1) clear; display_header "Custom Quick Install ILIAS LMS"; run "$SCRIPT_DIR/scripts/custom/ilias.sh" || echo_error "Ilias install failed."; pause ;;
       0) return ;;
       *) echo_error "Invalid option. Please try again."; pause ;;
     esac
   done
-} 
+}
 
-###################
-#   MAIN MENU     #
-###################
 while true; do
   clear
   display_header "SYSTEM ADMINISTRATION MENU"

@@ -3,8 +3,11 @@ set -Eeuo pipefail
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-trap 'err_trap' ERR
+require "lib/log.sh"
+require "lib/ui.sh"
+require "lib/core.sh"
+require "lib/pkg.sh"
+trap err_trap ERR
 
 need_sudo || exit 1
 
@@ -15,21 +18,12 @@ main() {
 
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
-  local packages=(
-    ca-certificates
-    curl
-    gnupg
-    lsb-release
-  )
+  local packages=(ca-certificates curl gnupg lsb-release)
 
   echo_note "Updating package index..."
   apt_update
-
   echo_note "Installing packages..."
-  local pkg
-  for pkg in "${packages[@]}"; do
-    apt_install "$pkg"
-  done
+  apt_install "${packages[@]}"
 
   echo_success "Baseline packages installed successfully."
 }
