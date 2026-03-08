@@ -20,48 +20,63 @@ require_lib install
 
 POSTGRES_PACKAGE=""
 POSTGRES_SERVICE=""
+POSTGRES_SKIP_INSTALL=0
 
-show_preinstall_message() {
+show_message() {
   info "This action will install PostgreSQL server package(s) and enable/start the PostgreSQL service."
-  info "Prerequisites: root privileges and package repository access."
-  info "Key side effects: database packages and service state will change."
 }
 
-run_checks() {
+run_prereq_checks() {
   need_root
   os_detect
   os_require_supported
-
   POSTGRES_PACKAGE="$(os_resolve_pkg postgresql_server)"
   POSTGRES_SERVICE="$(os_resolve_service postgresql)"
+}
 
+check_already_installed() {
+  if pkg_is_installed "$POSTGRES_PACKAGE" && service_exists "$POSTGRES_SERVICE" && service_is_active "$POSTGRES_SERVICE"; then
+    POSTGRES_SKIP_INSTALL=1
+    info "PostgreSQL package and active service already present."
+  fi
+}
+
+check_conflicts() {
   if db_detect_conflicts "postgresql"; then
     db_print_conflict_risk "postgresql"
   fi
 }
 
-run_install() {
-  pkg_refresh_index --reason "postgresql installation"
-  pkg_install "$POSTGRES_PACKAGE"
-  service_enable_now "$POSTGRES_SERVICE"
+show_install_plan() {
+  verify_item "package" "$POSTGRES_PACKAGE"
+  verify_item "service" "$POSTGRES_SERVICE"
 }
 
-post_install() {
-  db_print_install_summary "postgresql" "$POSTGRES_SERVICE"
-  verify_section "Version checks"
+run_install() {
+  if [[ "$POSTGRES_SKIP_INSTALL" -eq 1 ]]; then
+    info "Skipping package installation; target already satisfied."
+    return 0
+  fi
+
+  pkg_refresh_index --reason "postgresql installation"
+  pkg_install "$POSTGRES_PACKAGE"
+}
+
+run_service_config() { service_enable_now "$POSTGRES_SERVICE"; }
+
+post_install_verify() {
+  verify_section "Post-install verification"
   verify_command "psql --version" psql --version || true
-  verify_section "Service status"
   verify_systemd_service "$POSTGRES_SERVICE" || true
 }
+
+final_summary() { success "PostgreSQL installation workflow finished."; }
 
 main() {
   run_install_workflow \
     "PostgreSQL installation" \
     "Proceed with PostgreSQL installation?" \
-    show_preinstall_message \
-    run_checks \
-    run_install \
-    post_install
+    show_message run_prereq_checks check_already_installed check_conflicts show_install_plan run_install run_service_config post_install_verify final_summary
 }
 
 main "$@"

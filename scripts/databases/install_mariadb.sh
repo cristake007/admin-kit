@@ -21,37 +21,24 @@ require_lib install
 MARIADB_HARDEN_MODE="interactive"
 MARIADB_PACKAGE=""
 MARIADB_SERVICE=""
+MARIADB_SKIP_INSTALL=0
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --hardening-mode)
         shift
-        if [[ $# -eq 0 ]]; then
-          error "Missing value for --hardening-mode (interactive|apply|skip)."
-          return 1
-        fi
-        case "$1" in
+        case "${1:-}" in
           interactive|apply|skip) MARIADB_HARDEN_MODE="$1" ;;
-          *) error "Invalid --hardening-mode value: $1"; return 1 ;;
+          *) error "Invalid --hardening-mode value: ${1:-<empty>}"; return 1 ;;
         esac
         ;;
       --harden) MARIADB_HARDEN_MODE="apply" ;;
       --skip-harden) MARIADB_HARDEN_MODE="skip" ;;
-      *)
-        error "Unknown argument: $1"
-        error "Usage: $0 [--hardening-mode interactive|apply|skip|--harden|--skip-harden]"
-        return 1
-        ;;
+      *) error "Unknown argument: $1"; return 1 ;;
     esac
     shift
   done
-}
-
-show_preinstall_message() {
-  info "This action will install MariaDB server and enable/start the MariaDB service."
-  info "Prerequisites: root privileges and package repository access."
-  info "Key side effects: database packages/service state will change; optional hardening can alter MariaDB system tables."
 }
 
 resolve_hardening_mode() {
@@ -61,7 +48,6 @@ resolve_hardening_mode() {
     return 0
   fi
   if [[ ! -t 0 ]]; then
-    info "Non-interactive session detected; optional MariaDB hardening will be skipped."
     printf 'skip\n'
     return 0
   fi
@@ -69,12 +55,8 @@ resolve_hardening_mode() {
 }
 
 get_db_client() {
-  if command -v mariadb >/dev/null 2>&1; then
-    printf 'mariadb\n'; return 0
-  fi
-  if command -v mysql >/dev/null 2>&1; then
-    printf 'mysql\n'; return 0
-  fi
+  if command -v mariadb >/dev/null 2>&1; then printf 'mariadb\n'; return 0; fi
+  if command -v mysql >/dev/null 2>&1; then printf 'mysql\n'; return 0; fi
   return 1
 }
 
@@ -105,34 +87,27 @@ show_hardening_verification() {
   remote_root="$(db_query "$client" "SELECT COUNT(*) FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost','127.0.0.1','::1');")"
   test_db="$(db_query "$client" "SELECT COUNT(*) FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='test';")"
 
-  [[ "$anonymous_users" == "0" ]] && success "Verification: anonymous users absent." || warn "Verification: anonymous users still present ($anonymous_users)."
-  [[ "$remote_root" == "0" ]] && success "Verification: non-local root hosts absent." || warn "Verification: non-local root hosts still present ($remote_root)."
-  [[ "$test_db" == "0" ]] && success "Verification: test database absent." || warn "Verification: test database still present ($test_db)."
+  [[ "$anonymous_users" == "0" ]] && success "Hardening verification: anonymous users absent." || warn "Hardening verification: anonymous users still present ($anonymous_users)."
+  [[ "$remote_root" == "0" ]] && success "Hardening verification: non-local root hosts absent." || warn "Hardening verification: non-local root hosts still present ($remote_root)."
+  [[ "$test_db" == "0" ]] && success "Hardening verification: test database absent." || warn "Hardening verification: test database still present ($test_db)."
 }
 
 harden_mariadb_if_requested() {
-  local harden_mode="${1:?mode required}"
-  if [[ "$harden_mode" != "apply" ]]; then
+  if [[ "$MARIADB_HARDEN_MODE" != "apply" ]]; then
     info "MariaDB hardening skipped (optional)."
     return 0
   fi
 
   local client
-  if ! client="$(get_db_client)"; then
-    warn "MariaDB client binary not found; skipped hardening checks."
-    return 0
-  fi
-  if ! db_can_auth_without_password "$client"; then
-    warn "Cannot authenticate to MariaDB as local root without password; skipped scripted hardening."
-    return 0
-  fi
+  client="$(get_db_client)" || { warn "MariaDB client binary not found; skipped scripted hardening checks."; return 0; }
+  db_can_auth_without_password "$client" || { warn "Cannot authenticate to MariaDB as local root without password; skipped scripted hardening."; return 0; }
+
   if mariadb_is_hardened "$client"; then
     success "MariaDB hardening already satisfied; no changes needed."
     show_hardening_verification "$client"
     return 0
   fi
 
-  info "Applying scripted MariaDB hardening."
   db_query "$client" "DELETE FROM mysql.user WHERE User='';"
   db_query "$client" "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost','127.0.0.1','::1');"
   db_query "$client" "DROP DATABASE IF EXISTS test;"
@@ -141,10 +116,14 @@ harden_mariadb_if_requested() {
 
   show_hardening_verification "$client"
   mariadb_is_hardened "$client" || { error "MariaDB hardening verification failed."; return 1; }
-  success "MariaDB hardening applied successfully."
 }
 
-run_checks() {
+show_message() {
+  info "This action will install MariaDB server and enable/start its service."
+  info "Optional hardening can remove anonymous users, remove remote root hosts, and drop test database."
+}
+
+run_prereq_checks() {
   need_root
   os_detect
   os_require_supported
@@ -152,49 +131,70 @@ run_checks() {
   MARIADB_PACKAGE="$(os_resolve_pkg mariadb_server)"
   MARIADB_SERVICE="$(os_resolve_service mariadb)"
 
-  if db_detect_conflicts "mariadb"; then
-    db_print_conflict_risk "mariadb"
-  fi
-
   local harden_mode
   harden_mode="$(resolve_hardening_mode "$MARIADB_HARDEN_MODE")"
   if [[ "$harden_mode" == "interactive" ]]; then
-    info "Optional hardening removes anonymous users, removes non-local root hosts, and drops the test database."
     if confirm_proceed "Proceed with optional MariaDB hardening?"; then
       MARIADB_HARDEN_MODE="apply"
     else
       MARIADB_HARDEN_MODE="skip"
-      operator_aborted
     fi
   else
     MARIADB_HARDEN_MODE="$harden_mode"
   fi
 }
 
-run_install() {
-  pkg_refresh_index --reason "mariadb installation"
-  pkg_install "$MARIADB_PACKAGE"
-  service_enable_now "$MARIADB_SERVICE"
-  harden_mariadb_if_requested "$MARIADB_HARDEN_MODE"
+check_already_installed() {
+  if pkg_is_installed "$MARIADB_PACKAGE" && service_exists "$MARIADB_SERVICE" && service_is_active "$MARIADB_SERVICE"; then
+    MARIADB_SKIP_INSTALL=1
+    info "MariaDB package and active service already present."
+  fi
 }
 
-post_install() {
-  db_print_install_summary "mariadb" "$MARIADB_SERVICE"
-  verify_section "Version checks"
+check_conflicts() {
+  if db_detect_conflicts "mariadb"; then
+    db_print_conflict_risk "mariadb"
+  fi
+}
+
+show_install_plan() {
+  verify_item "package" "$MARIADB_PACKAGE"
+  verify_item "service" "$MARIADB_SERVICE"
+  verify_item "hardening mode" "$MARIADB_HARDEN_MODE"
+}
+
+run_install() {
+  if [[ "$MARIADB_SKIP_INSTALL" -eq 1 ]]; then
+    info "Skipping package installation; target already satisfied."
+    return 0
+  fi
+
+  pkg_refresh_index --reason "mariadb installation"
+  pkg_install "$MARIADB_PACKAGE"
+}
+
+run_service_config() {
+  service_enable_now "$MARIADB_SERVICE"
+  harden_mariadb_if_requested
+}
+
+post_install_verify() {
+  verify_section "Post-install verification"
   verify_command "mariadb --version" mariadb --version || verify_command "mysql --version" mysql --version || true
-  verify_section "Service status"
   verify_systemd_service "$MARIADB_SERVICE" || true
+}
+
+final_summary() {
+  success "MariaDB installation workflow finished."
 }
 
 main() {
   parse_args "$@"
+
   run_install_workflow \
     "MariaDB installation" \
     "Proceed with MariaDB installation?" \
-    show_preinstall_message \
-    run_checks \
-    run_install \
-    post_install
+    show_message run_prereq_checks check_already_installed check_conflicts show_install_plan run_install run_service_config post_install_verify final_summary
 }
 
 main "$@"

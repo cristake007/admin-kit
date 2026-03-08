@@ -12,10 +12,10 @@ require_lib log
 require_lib core
 require_lib ui
 require_lib verify
+require_lib install
 
-current_timezone() {
-  timedatectl show --property=Timezone --value
-}
+REQUESTED_TIMEZONE=""
+CURRENT_TIMEZONE=""
 
 timezone_exists() {
   local timezone="$1"
@@ -37,61 +37,67 @@ prompt_timezone() {
     fi
 
     warn "Unknown timezone: $timezone_input"
-    info "Use 'timedatectl list-timezones' to see valid values."
   done
 }
 
-show_preinstall_message() {
-  local requested="${1:-<unset>}"
-  info "This action will set the system timezone to '$requested'."
-  info "Prerequisites: root privileges and a valid timezone from timedatectl list-timezones."
-  info "Key side effects: system timezone configuration will change."
+show_message() {
+  info "This action will set the system timezone."
+}
+
+gather_input() {
+  need_root
+  command -v timedatectl >/dev/null 2>&1 || { error "timedatectl is not available on this system."; return 1; }
+
+  REQUESTED_TIMEZONE="${1:-${REQUESTED_TIMEZONE:-}}"
+  if [[ -z "$REQUESTED_TIMEZONE" ]]; then
+    REQUESTED_TIMEZONE="$(prompt_timezone)"
+  fi
+
+  timezone_exists "$REQUESTED_TIMEZONE" || { error "Unknown timezone: $REQUESTED_TIMEZONE"; return 1; }
+}
+
+show_current_state() {
+  CURRENT_TIMEZONE="$(timedatectl show --property=Timezone --value)"
+  verify_section "Current timezone"
+  verify_item "timezone" "$CURRENT_TIMEZONE"
+}
+
+change_needed() {
+  [[ "$CURRENT_TIMEZONE" != "$REQUESTED_TIMEZONE" ]]
+}
+
+safety_checks() {
+  verify_section "Requested change"
+  verify_item "requested timezone" "$REQUESTED_TIMEZONE"
+}
+
+apply_change() {
+  timedatectl set-timezone "$REQUESTED_TIMEZONE"
+}
+
+verify_result() {
+  verify_section "Result"
+  verify_item "timezone" "$(timedatectl show --property=Timezone --value)"
+}
+
+summary() {
+  success "Timezone update completed."
 }
 
 main() {
-  need_root
+  REQUESTED_TIMEZONE="${1:-}"
 
-  if ! command -v timedatectl >/dev/null 2>&1; then
-    error "timedatectl is not available on this system."
-    return 1
-  fi
-
-  local requested_timezone="${1:-}"
-  if [[ -z "$requested_timezone" ]]; then
-    requested_timezone="$(prompt_timezone)"
-  fi
-
-  if ! timezone_exists "$requested_timezone"; then
-    error "Unknown timezone: $requested_timezone"
-    return 1
-  fi
-
-  local existing_timezone=""
-  existing_timezone="$(current_timezone)"
-
-  if [[ "$existing_timezone" == "$requested_timezone" ]]; then
-    info "Timezone is already set to $requested_timezone; no change needed."
-    verify_section "Effective settings"
-    verify_item "timezone" "${existing_timezone:-<empty>}"
-    return 0
-  fi
-
-  show_preinstall_message "$requested_timezone"
-  info "Current timezone: $existing_timezone"
-  info "Requested timezone: $requested_timezone"
-
-  if ! confirm_proceed; then
-    operator_aborted
-    return 0
-  fi
-
-  timedatectl set-timezone "$requested_timezone"
-
-  local applied_timezone=""
-  applied_timezone="$(current_timezone)"
-  success "Timezone update completed."
-  verify_section "Effective settings"
-  verify_item "timezone" "${applied_timezone:-<empty>}"
+  run_action_workflow \
+    "Set timezone" \
+    "Proceed with timezone change to '$REQUESTED_TIMEZONE'?" \
+    show_message \
+    gather_input \
+    show_current_state \
+    change_needed \
+    safety_checks \
+    apply_change \
+    verify_result \
+    summary
 }
 
 main "$@"

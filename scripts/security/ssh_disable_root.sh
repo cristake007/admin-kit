@@ -15,36 +15,47 @@ require_lib os
 require_lib service
 require_lib ui
 require_lib verify
+require_lib install
 
-show_preinstall_message() {
-  info "This action will set PermitRootLogin no in /etc/ssh/sshd_config."
-  info "Prerequisites: root privileges and an installed sshd service."
-  info "Key side effects: sshd config is backed up, edited, validated, and service may restart."
+SSHD_CONFIG="/etc/ssh/sshd_config"
+CURRENT_SETTING="<unset>"
+
+ssh_root_setting() {
+  awk '
+    /^[[:space:]]*#/ {next}
+    /^[[:space:]]*PermitRootLogin[[:space:]]+/ {print $2; found=1; exit}
+    END {if (!found) print "<unset>"}
+  ' "$SSHD_CONFIG"
 }
 
-main() {
+show_message() {
+  info "This action will set PermitRootLogin no in /etc/ssh/sshd_config."
+}
+
+gather_input() {
   need_root
   os_detect
+  [[ -f "$SSHD_CONFIG" ]] || { error "SSH config not found: $SSHD_CONFIG"; return 1; }
+}
 
-  local cfg="/etc/ssh/sshd_config"
-  if [[ ! -f "$cfg" ]]; then
-    error "SSH config not found: $cfg"
-    return 1
-  fi
+show_current_state() {
+  CURRENT_SETTING="$(ssh_root_setting)"
+  verify_section "Current SSH root-login state"
+  verify_item "PermitRootLogin" "$CURRENT_SETTING"
+}
 
-  show_preinstall_message
-  if ! confirm_proceed; then
-    operator_aborted
-    return 0
-  fi
+change_needed() {
+  [[ "$CURRENT_SETTING" != "no" ]]
+}
 
-  backup_file "$cfg"
-  replace_or_add_key_value "$cfg" "PermitRootLogin" "no"
+safety_checks() {
+  verify_item "sshd config validation" "will run sshd -t after update"
+}
 
-  if ! sshd -t -f "$cfg"; then
-    error "sshd config validation failed. Restore backup before continuing."
-    return 1
-  fi
+apply_change() {
+  backup_file "$SSHD_CONFIG"
+  replace_or_add_key_value "$SSHD_CONFIG" "PermitRootLogin" "no"
+  sshd -t -f "$SSHD_CONFIG"
 
   if service_exists ssh; then
     service_restart_if_present ssh
@@ -53,17 +64,29 @@ main() {
   else
     warn "SSH service unit not found; config changed but service not restarted."
   fi
+}
 
-  local ssh_root_setting
-  ssh_root_setting="$(awk '
-    /^[[:space:]]*#/ {next}
-    /^[[:space:]]*PermitRootLogin[[:space:]]+/ {print $2; found=1; exit}
-    END {if (!found) print "<unset>"}
-  ' "$cfg")"
+verify_result() {
+  verify_section "Result"
+  verify_item "PermitRootLogin" "$(ssh_root_setting)"
+}
 
+summary() {
   success "Root SSH login disabled."
-  verify_section "Effective settings"
-  verify_item "PermitRootLogin" "$ssh_root_setting"
+}
+
+main() {
+  run_action_workflow \
+    "Disable SSH root login" \
+    "Proceed with disabling SSH root login?" \
+    show_message \
+    gather_input \
+    show_current_state \
+    change_needed \
+    safety_checks \
+    apply_change \
+    verify_result \
+    summary
 }
 
 main "$@"

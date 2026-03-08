@@ -13,10 +13,12 @@ require_lib os
 require_lib pkg
 require_lib core
 require_lib ui
+require_lib verify
 require_lib install
 
 COMMON_PROFILE="baseline"
 declare -a COMMON_PACKAGES=()
+COMMON_SKIP_INSTALL=0
 
 bundle_to_array() {
   local capability="${1:?capability required}"
@@ -27,49 +29,83 @@ bundle_to_array() {
   read -r -a out_ref <<<"$raw"
 }
 
-show_preinstall_message() {
+show_message() {
   info "This action will install the package profile: $COMMON_PROFILE."
-  info "Prerequisites: root privileges and package repository access."
-  info "Key side effects: additional system packages will be installed."
 }
 
-run_checks() {
+run_prereq_checks() {
   need_root
   os_detect
   os_require_supported
 
   local -a baseline_packages=()
   local -a ilias_packages=()
-
   bundle_to_array common_baseline_bundle baseline_packages
 
   case "$COMMON_PROFILE" in
-    baseline)
-      COMMON_PACKAGES=("${baseline_packages[@]}")
-      ;;
+    baseline) COMMON_PACKAGES=("${baseline_packages[@]}") ;;
     ilias)
-      if ! bundle_to_array ilias_required_bundle ilias_packages; then
+      bundle_to_array ilias_required_bundle ilias_packages || {
         error "ILIAS package profile is unsupported on distro family: $OS_FAMILY"
         return 1
-      fi
+      }
       COMMON_PACKAGES=("${baseline_packages[@]}" "${ilias_packages[@]}")
       ;;
     *)
       error "Unknown package profile: $COMMON_PROFILE"
-      error "Usage: $0 [baseline|ilias]"
       return 1
       ;;
   esac
 }
 
+check_already_installed() {
+  local missing=0
+  local pkg
+  for pkg in "${COMMON_PACKAGES[@]}"; do
+    if ! pkg_is_installed "$pkg"; then
+      missing=1
+      break
+    fi
+  done
+
+  if [[ "$missing" -eq 0 ]]; then
+    COMMON_SKIP_INSTALL=1
+    info "All packages for profile '$COMMON_PROFILE' are already installed."
+  fi
+}
+
+check_conflicts() { info "No explicit conflicts for profile '$COMMON_PROFILE'."; }
+
+show_install_plan() {
+  verify_item "profile" "$COMMON_PROFILE"
+  verify_item "packages" "${COMMON_PACKAGES[*]}"
+}
+
 run_install() {
+  if [[ "$COMMON_SKIP_INSTALL" -eq 1 ]]; then
+    info "Skipping package installation; profile already satisfied."
+    return 0
+  fi
+
   pkg_refresh_index --reason "common package installation ($COMMON_PROFILE profile)"
   pkg_install "${COMMON_PACKAGES[@]}"
 }
 
-post_install() {
-  success "Installed package profile: $COMMON_PROFILE"
+run_service_config() { info "No additional service configuration required for this profile."; }
+
+post_install_verify() {
+  verify_section "Post-install verification"
+  local pkg
+  for pkg in "${COMMON_PACKAGES[@]}"; do
+    if pkg_is_installed "$pkg"; then
+      verify_item "package $pkg" "installed"
+    else
+      verify_warning "package $pkg" "missing"
+    fi
+  done
 }
+
+final_summary() { success "Installed package profile: $COMMON_PROFILE"; }
 
 main() {
   COMMON_PROFILE="${1:-baseline}"
@@ -77,10 +113,7 @@ main() {
   run_install_workflow \
     "Common packages installation" \
     "Proceed with common package profile '$COMMON_PROFILE'?" \
-    show_preinstall_message \
-    run_checks \
-    run_install \
-    post_install
+    show_message run_prereq_checks check_already_installed check_conflicts show_install_plan run_install run_service_config post_install_verify final_summary
 }
 
 main "$@"
