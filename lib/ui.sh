@@ -9,7 +9,10 @@ pause() {
 }
 
 confirm() {
-  read -r -p "${1:-Proceed?} (Y/n): " ans
+  local prompt="${1:-Proceed?}"
+  local ans
+  printf "%s (Y/n): " "$prompt"
+  read -r ans
   [[ -z "$ans" || "$ans" =~ ^[Yy]$ ]]
 }
 
@@ -17,7 +20,8 @@ confirm_skip() {
   local prompt="${1:-Proceed?}"
   local ans
   while true; do
-    read -r -p "${prompt} (y=yes / n=no / s=skip): " ans
+    printf "%s (y=yes / n=no / s=skip): " "$prompt"
+    read -r ans
     case "$ans" in
       [Yy]) return 0 ;;
       [Nn]) return 1 ;;
