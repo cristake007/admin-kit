@@ -1,29 +1,31 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+# Purpose: Install packages commonly needed by ILIAS.
+# Supports: debian, rhel, suse
+# Requires: root privileges
+# Safe to rerun: yes
+# Side effects: package installation
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck disable=SC1091
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-
-need_sudo || exit 1
+require_lib log
+require_lib core
+require_lib os
+require_lib pkg
 
 main() {
-echo_info "This script installs all required packages for Ilias LMS."
+  need_root
+  os_detect
+  os_require_supported
 
-packages=( 
-    "imagemagick" "ghostscript" "graphicsmagick" "wkhtmltopdf" "libjs-mathjax"
-    "libreoffice" "libreoffice-writer"  "htmldoc" "abiword" "xpdf" "poppler-utils"
-    "ffmpeg" "sox" "html2text"
-    "clamav" "clamav-daemon"
-    "openjdk-17-jdk" "xvfb" "tidy" "maven"
-    
-)
+  if [[ "$OS_FAMILY" == "arch" ]]; then
+    error "ILIAS required package bundle is not supported on arch in this toolkit."
+    return 1
+  fi
 
-install_items package "${packages[@]}" || {
-  echo_error "Error installing system packages"
-  exit 1
+  pkg_update_index
+  pkg_install imagemagick ghostscript ffmpeg clamav maven
+  success "Installed core ILIAS required packages."
 }
-echo_success "All required packages installed successfully."
-}
-main
+
+main "$@"

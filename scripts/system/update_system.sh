@@ -1,31 +1,30 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+# Purpose: Update package metadata and upgrade installed packages.
+# Supports: debian, rhel, suse, arch
+# Requires: root privileges
+# Safe to rerun: yes
+# Side effects: package updates
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-trap 'err_trap' ERR
+require_lib log
+require_lib os
+require_lib pkg
+require_lib core
 
-need_sudo || exit 1
+main() {
+  need_root
+  os_detect
+  os_require_supported
 
-main(){
-  echo_info "This script updates the package lists, upgrades installed packages,"
-  echo_info "and performs a distribution upgrade to ensure your system is up-to-date."
-  echo ""
+  info "Updating package index..."
+  pkg_update_index
 
-  if ! confirm "Do you want to continue?"; then
-    echo_info "Cancelled."; exit 0
-  fi
+  info "Upgrading installed packages..."
+  pkg_upgrade_system
 
-  apt_update
-  echo_success "Package lists updated."
-  if confirm "Upgrade packages now?"; then
-    echo_info "Upgrading packages (dist-upgrade)..."
-    apt_upgrade
-    echo_success "Upgrade completed."
-  else
-    echo_info "Upgrade skipped."
-  fi
+  success "System update completed."
 }
 
-main
+main "$@"

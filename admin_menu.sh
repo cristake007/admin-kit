@@ -1,279 +1,164 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-trap err_trap ERR
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# Bootstrap + functions
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/scripts/bootstrap.sh"
-require "functions/functions.sh"
+require_lib log
+require_lib ui
+require_lib core
 
-###################
-#      SYSTEM     #
-###################
-system_screen() {
+run_and_pause() {
+  local rel_script="$1"
+  if run_script "$rel_script"; then
+    success "Done: $rel_script"
+  else
+    error "Failed: $rel_script"
+  fi
+  pause
+}
+
+system_menu() {
   while true; do
     clear
-    display_header "SYSTEM"
-    echo_note "1) System update and upgrade"
-    echo_note "2) Create user with sudo privileges"
-    echo_note "3) Set timezone"
-    echo_note "4) Set hostname"
-    echo_note "5) Install common packages"
-    echo_note ""
-    echo_note "0) Return to Main Menu"
-    echo -ne "\n${YELLOW}Enter your choice:${NC} "
-    read -r choice
-
+    display_header "System"
+    echo "1) Update system"
+    echo "2) Create privileged user"
+    echo "3) Set timezone"
+    echo "4) Set hostname"
+    echo "5) Install common packages"
+    echo "0) Back"
+    read -r -p "Choice: " choice
     case "$choice" in
-      1)
-        clear
-        display_header "Update system"
-        run "$SCRIPT_DIR/scripts/system/update_system.sh" || echo_error "System update/upgrade failed."; pause;;
-      2)
-        clear
-        display_header "Create sudo user"
-        run "$SCRIPT_DIR/scripts/system/create_user.sh" || echo_error "User creation failed."; pause;;
-      3)
-        clear
-        display_header "Set timezone"
-        run "$SCRIPT_DIR/scripts/system/set_timezone.sh" || echo_error "Setting timzone failed."; pause;;
-      4)
-        clear
-        display_header "Set hostname"
-        run "$SCRIPT_DIR/scripts/system/set_hostname.sh" || echo_error "Setting hostname failed."; pause;;
-      5)
-        clear
-        display_header "Install common packages"
-        run "$SCRIPT_DIR/scripts/system/common_packages.sh" || echo_error "Installing common packages failed."; pause;;
+      1) run_and_pause scripts/system/update_system.sh ;;
+      2) run_and_pause scripts/system/create_user.sh ;;
+      3) run_and_pause scripts/system/set_timezone.sh ;;
+      4) run_and_pause scripts/system/set_hostname.sh ;;
+      5) run_and_pause scripts/system/common_packages.sh ;;
       0) return ;;
-      *) echo_error "Invalid option. Please try again."; pause ;;
+      *) warn "Invalid option"; pause ;;
     esac
   done
 }
 
-
-###################
-#    WEBSERVER    #
-###################
-webserver_screen() {
+webserver_menu() {
   while true; do
     clear
     display_header "Webserver"
-    echo_note "1) Install Apache2"
-    echo_note "2) Install Nginx"
-    echo_note "3) Install Certbot (Let's Encrypt)"
-    echo_note ""
-    echo_note "0) Return to Main Menu"
-    echo -ne "\n${YELLOW}Enter your choice:${NC} "
-    read -r choice
-
+    echo "1) Install Apache"
+    echo "2) Install Nginx"
+    echo "3) Install Certbot"
+    echo "0) Back"
+    read -r -p "Choice: " choice
     case "$choice" in
-      1)
-        clear
-        display_header "Install Apache2"
-        run "$SCRIPT_DIR/scripts/webserver/apache2.sh" || echo_error "Apache2 setup failed failed."; pause ;;
-      2)
-        clear
-        display_header "Install Nginx"
-        run "$SCRIPT_DIR/scripts/webserver/nginx.sh" || echo_error "Nginx install failed."; pause ;;
-      3)
-        clear
-        display_header "Install Certbot"
-        run "$SCRIPT_DIR/scripts/webserver/certbot.sh" || echo_error "Certbot install failed."; pause ;;
+      1) run_and_pause scripts/webserver/apache2.sh ;;
+      2) run_and_pause scripts/webserver/nginx.sh ;;
+      3) run_and_pause scripts/webserver/certbot.sh ;;
       0) return ;;
-      *) echo_error "Invalid option. Please try again."; pause ;;
+      *) warn "Invalid option"; pause ;;
     esac
   done
 }
 
-
-###################
-#    DATABASES    #
-###################
-databases_screen() {
+database_menu() {
   while true; do
     clear
     display_header "Databases"
-    echo_note "1) Install MariaDB"
-    echo_note "2) Install MySQL"
-    echo_note "3) Install PostgreSQL"
-    echo_note ""
-    echo_note "0) Return to Main Menu"
-    echo -ne "\n${YELLOW}Enter your choice:${NC} "
-    read -r choice
-
+    echo "1) Install MariaDB"
+    echo "2) Install MySQL"
+    echo "3) Install PostgreSQL"
+    echo "0) Back"
+    read -r -p "Choice: " choice
     case "$choice" in
-      1)
-        clear
-        display_header "Install MariaDB"
-        run "$SCRIPT_DIR/scripts/databases/install_mariadb.sh" || echo_error "MariaDB setup failed failed."; pause ;;
-      2)
-        clear
-        display_header "Install MySQL"
-        run "$SCRIPT_DIR/scripts/databases/install_mysql.sh" || echo_error "MySQL install failed."; pause ;;
-      3)
-        clear
-        display_header "Install PostgreSQL"
-        run "$SCRIPT_DIR/scripts/databases/install_postgresql.sh" || echo_error "PostgreSQL install failed."; pause ;;
+      1) run_and_pause scripts/databases/install_mariadb.sh ;;
+      2) run_and_pause scripts/databases/install_mysql.sh ;;
+      3) run_and_pause scripts/databases/install_postgresql.sh ;;
       0) return ;;
-      *) echo_error "Invalid option. Please try again."; pause ;;
+      *) warn "Invalid option"; pause ;;
     esac
   done
 }
 
-
-###################
-#     SECURITY    #
-###################
-security_screen() {
+security_menu() {
   while true; do
     clear
     display_header "Security"
-    echo_note "1) Disable root SSH login"
-    echo_note "2) Install fail2ban"
-    echo_note "2) Install UFW"
-    echo_note ""
-    echo_note "0) Return to Main Menu"
-    echo -ne "\n${YELLOW}Enter your choice:${NC} "
-    read -r choice
-
+    echo "1) Disable SSH root login"
+    echo "2) Install fail2ban"
+    echo "3) Install firewall tooling"
+    echo "0) Back"
+    read -r -p "Choice: " choice
     case "$choice" in
-      1)
-        clear
-        display_header "Disable root SSH login"
-        run "$SCRIPT_DIR/scripts/security/ssh_disable_root.sh" || echo_error "SSH root login config failed."; pause ;;
-      2)
-        clear
-        display_header "Install Fail2Ban"
-        run "$SCRIPT_DIR/scripts/security/install_fail2ban.sh" || echo_error "Fail2ban install failed."; pause ;;
-      3)
-        clear
-        display_header "Install UFW"
-        run "$SCRIPT_DIR/scripts/security/install_ufw.sh" || echo_error "UFW install failed."; pause ;;
+      1) run_and_pause scripts/security/ssh_disable_root.sh ;;
+      2) run_and_pause scripts/security/install_fail2ban.sh ;;
+      3) run_and_pause scripts/security/install_ufw.sh ;;
       0) return ;;
-      *) echo_error "Invalid option. Please try again."; pause ;;
+      *) warn "Invalid option"; pause ;;
     esac
   done
 }
 
-backups_screen(){
-  echo_error "Backup functionality is under development."
+developer_menu() {
   while true; do
     clear
-    display_header "Backups"
-    echo_note "1) Backup script --in development"
-    echo_note "0) Return to Main Menu"
-    echo_note ""
-    echo -ne "\n${YELLOW}Enter your choice:${NC} "
-    read -r choice
-
+    display_header "Developer"
+    echo "1) Install extrepo"
+    echo "2) Install PHP"
+    echo "3) Install Composer"
+    echo "4) Install Node.js"
+    echo "5) Install Symfony prerequisites"
+    echo "0) Back"
+    read -r -p "Choice: " choice
     case "$choice" in
-      1)
-        clear
-        display_header "Backup script"
-        echo_info "This feature is under development."; pause ;;
-
+      1) run_and_pause scripts/developer/install_extrepo.sh ;;
+      2) run_and_pause scripts/developer/install_php.sh ;;
+      3) run_and_pause scripts/developer/install_composer.sh ;;
+      4) run_and_pause scripts/developer/install_nodejs.sh ;;
+      5) run_and_pause scripts/developer/install_symfony.sh ;;
       0) return ;;
-      *) echo_error "Invalid option. Please try again."; pause ;;
+      *) warn "Invalid option"; pause ;;
     esac
   done
 }
 
-developer_screen(){
+custom_menu() {
   while true; do
     clear
-    display_header "Developer tools"
-    echo_note "1) Install Extrepo (external apt repositories)"
-    echo_note "2) Install PHP and common extensions"
-    echo_note "3) Install Composer"
-    echo_note "4) Install Node.js and npm"
-    echo_note "5) Install Symfony-CLI"
-    echo_note ""
-    echo_note "0) Return to Main Menu"
-    echo -ne "\n${YELLOW}Enter your choice:${NC} "
-    read -r choice
-
+    display_header "Custom"
+    echo "1) ILIAS baseline workflow"
+    echo "0) Back"
+    read -r -p "Choice: " choice
     case "$choice" in
-      1)
-        clear
-        display_header "Install EXTREPO"
-        run "$SCRIPT_DIR/scripts/developer/install_extrepo.sh" || echo_error "Extrepo install failed."; pause ;;
-      2)
-        clear
-        display_header "Install PHP and common extensions"
-        run "$SCRIPT_DIR/scripts/developer/install_php.sh" || echo_error "PHP install failed."; pause ;;
-      3)
-        clear
-        display_header "Composer (PHP dependency manager)"
-        run "$SCRIPT_DIR/scripts/developer/install_composer.sh" || echo_error "Composer install failed."; pause ;;
-      4)
-        clear
-        display_header "Install Node.js and npm"
-        run "$SCRIPT_DIR/scripts/developer/install_nodejs.sh" || echo_error "Node.js install failed."; pause ;;
-      5)
-        clear
-        display_header "Install Symfony-CLI"
-        run "$SCRIPT_DIR/scripts/developer/install_symfony.sh" || echo_error "Symfony install failed."; pause ;;
-      # 5)
-      #   clear
-      #   display_header "Install Python and pip"
-      #   run "$SCRIPT_DIR/scripts/helper/install_pypip.sh" || echo_error "Pyhton install failed."; pause;;
+      1) run_and_pause scripts/custom/ilias.sh ;;
       0) return ;;
-      *) echo_error "Invalid option. Please try again."; pause ;;
+      *) warn "Invalid option"; pause ;;
     esac
   done
 }
 
-custom_screen(){
+main() {
   while true; do
     clear
-    display_header "Custom scripts"
-    echo_note "1) Custom Quick Install ILIAS LMS"
-    echo_note ""
-    echo_note "0) Return to Main Menu"
-    echo -ne "\n${YELLOW}Enter your choice:${NC} "
-    read -r choice
-
+    display_header "Admin Kit"
+    echo "1) System"
+    echo "2) Webserver"
+    echo "3) Databases"
+    echo "4) Security"
+    echo "5) Developer"
+    echo "6) Custom"
+    echo "0) Exit"
+    read -r -p "Choice: " choice
     case "$choice" in
-      1)
-        clear
-        display_header "Custom Quick Install ILIAS LMS"
-        run "$SCRIPT_DIR/scripts/custom/ilias.sh" || echo_error "Ilias install failed."; pause;;
-      0) return ;;
-      *) echo_error "Invalid option. Please try again."; pause ;;
+      1) system_menu ;;
+      2) webserver_menu ;;
+      3) database_menu ;;
+      4) security_menu ;;
+      5) developer_menu ;;
+      6) custom_menu ;;
+      0) exit 0 ;;
+      *) warn "Invalid option"; pause ;;
     esac
   done
-} 
+}
 
-###################
-#   MAIN MENU     #
-###################
-while true; do
-  clear
-  display_header "SYSTEM ADMINISTRATION MENU"
-  echo_note "1) SYSTEM"
-  echo_note "2) WEBSERVER PACKAGES (APACHE/NGINX)"
-  echo_note "3) DATABASE SERVERS (MYSQL/MARIADB/POSTGRESQL)"
-  echo_note "4) SERVER HARDENING"
-  echo_note "5) BACKUPS --IN DEVELOPMENT"
-  echo_note "6) DEVELOPER TOOLS (NODE.JS, COMPOSER, PHP, PYTHON, ETC.) --IN DEVELOPMENT"
-  echo_note "7) CUSTOM SCRIPTS --IN DEVELOPMENT"
-  echo_note ""
-  echo_note "------------------------------------------------"
-  echo_note "0) EXIT"
-  echo -ne "\n${YELLOW}Enter your choice:${NC} "
-  read -r main_choice
-
-  case "$main_choice" in
-    1) system_screen ;;
-    2) webserver_screen ;;
-    3) databases_screen ;;
-    4) security_screen ;;
-    5) backups_screen ;;
-    6) developer_screen ;;
-    7) custom_screen ;;
-    0) clear; echo_success "Thank you for using the System Administration Menu."; exit 0 ;;
-    *) echo_error "Invalid option. Please try again."; sleep 1 ;;
-  esac
-done
+main "$@"

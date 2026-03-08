@@ -1,40 +1,34 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+# Purpose: Install MariaDB server.
+# Supports: debian, rhel, suse, arch
+# Requires: root privileges
+# Safe to rerun: yes
+# Side effects: package install and service enablement
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck disable=SC1091
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-
-need_sudo || exit 1
+require_lib log
+require_lib os
+require_lib pkg
+require_lib service
+require_lib core
 
 main() {
-  echo_info "This will install MariaDB (server & client)."
-  echo_info "After installation, the MariaDB service will be enabled and started."
-  echo_info "The script will first detect if MySQL is installed, as MariaDB conflicts with MySQL."
-  echo ""
+  need_root
+  os_detect
+  os_require_supported
 
-  if ! confirm "Do you want to continue?"; then
-    echo_info "Cancelled."; exit 0
+  local pkg_name="mariadb-server"
+  local svc_name="mariadb"
+  if [[ "$OS_FAMILY" == "arch" ]]; then
+    pkg_name="mariadb"
   fi
 
-  if apt_is_installed mariadb-server; then
-    echo_success "MariaDB is already installed."
-    sudo systemctl enable --now mariadb
-    exit 0
-  fi
-
-  if apt_is_installed mysql-server || apt_is_installed mysql-community-server; then
-    echo_error "MySQL is already installed. MariaDB conflicts with MySQL."
-    exit 1
-  fi
-
-  apt_update
-  apt_install mariadb-server mariadb-client
-  sudo systemctl enable --now mariadb
-  echo_info "Securing MariaDB installation..."
-  sudo mysql_secure_installation
-  echo_success "MariaDB installed and started."
+  pkg_update_index
+  pkg_install "$pkg_name"
+  service_enable_now "$svc_name"
+  success "MariaDB installation completed."
 }
 
-main
+main "$@"

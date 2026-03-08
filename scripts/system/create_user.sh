@@ -1,40 +1,46 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+# Purpose: Create a privileged admin user.
+# Supports: linux with useradd/usermod
+# Requires: root privileges
+# Safe to rerun: yes
+# Side effects: user and group membership changes
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-
-need_sudo || exit 1
+require_lib log
+require_lib core
+require_lib validate
 
 main() {
-  echo_info "This script will create a new user with sudo privileges."
-  echo_info "Usernames must start with a letter and can contain lowercase letters, digits, underscores, and hyphens. Maximum length is 32 characters."
-  echo ""
-  
-  if ! confirm "Do you want to continue?"; then
-    echo_info "Cancelled."; exit 0
+  need_root
+
+  local username="${1:-}"
+  if [[ -z "$username" ]]; then
+    read -r -p "Enter username to create: " username
   fi
 
-  while true; do
-    read -r -p "Enter a username to create: " username
+  if ! validate_username "$username"; then
+    error "Invalid username format."
+    return 1
+  fi
 
-    # Validate: starts with letter; then lowercase letters/digits/_/-; max 32
-    if [[ "$username" =~ ^[a-z][-a-z0-9_]{0,31}$ ]]; then
-      if id "$username" &>/dev/null; then
-        echo_info "User '$username' already exists."
-      else
-        echo_note "Creating user '$username'..."
-        script -qec "sudo adduser \"$username\"" /dev/null
-        echo_note "Adding '$username' to 'sudo' group..."
-        sudo usermod -aG sudo "$username"
-        echo_success "User '$username' created and added to sudo group."
-      fi
-      break
-    else
-      echo_error "Invalid username. Use lowercase letters, digits, underscores; max 32 chars; start with a letter."
-    fi
-  done
+  if id "$username" >/dev/null 2>&1; then
+    info "User already exists: $username"
+  else
+    useradd -m -s /bin/bash "$username"
+    success "Created user: $username"
+  fi
+
+  if getent group sudo >/dev/null 2>&1; then
+    usermod -aG sudo "$username"
+  elif getent group wheel >/dev/null 2>&1; then
+    usermod -aG wheel "$username"
+  else
+    warn "No sudo/wheel group found; skipped privilege group assignment."
+  fi
+
+  success "User provisioning completed for: $username"
 }
 
-main
+main "$@"

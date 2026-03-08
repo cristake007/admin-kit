@@ -1,74 +1,48 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+# Purpose: Set system hostname and keep /etc/hosts in sync.
+# Supports: linux with hostnamectl
+# Requires: root privileges
+# Safe to rerun: yes
+# Side effects: hostname and /etc/hosts changes
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-trap 'err_trap' ERR
-
-need_sudo || exit 1
+require_lib log
+require_lib core
+require_lib validate
+require_lib file
 
 main() {
-  echo_info "Set system hostname"
-  echo_note "Type 'q' anytime to cancel."
-  echo
+  need_root
 
-  local current_hn current_fqdn
-  current_hn="$(hostname)"
-  current_fqdn="$(hostname -f 2>/dev/null || echo 'N/A')"
-  echo_note "Current hostname: ${current_hn}"
-  echo_note "Current FQDN: ${current_fqdn}"
-  echo
-
-  confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
-
-  local HN DN FQDN
-  while :; do
-    read -r -p "Enter short hostname (e.g., app01): " HN || { echo_info "Cancelled."; exit 0; }
-    HN="${HN,,}"          # lowercase
-    HN="${HN// /}"        # remove spaces
-
-    [[ "$HN" == "q" ]] && { echo_info "Cancelled."; exit 0; }
-
-    # 1-63 chars, a-z0-9-, cannot start/end with -
-    if [[ "$HN" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
-      break
-    fi
-    echo_error "Invalid hostname. Use letters/digits/hyphens, no leading/trailing hyphen."
-  done
-
-  while :; do
-    read -r -p "Enter domain (optional, e.g., example.com): " DN || { echo_info "Cancelled."; exit 0; }
-    DN="${DN,,}"
-    DN="${DN// /}"
-
-    [[ "$DN" == "q" ]] && { echo_info "Cancelled."; exit 0; }
-
-    # empty is allowed
-    if [[ -z "$DN" ]]; then
-      break
-    fi
-
-    # simple domain validation (labels separated by dots, no leading/trailing hyphens)
-    if [[ "$DN" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$ ]]; then
-      break
-    fi
-    echo_error "Invalid domain format. Example: example.com"
-  done
-
-  FQDN="$HN"
-  [[ -n "$DN" ]] && FQDN="${HN}.${DN}"
-
-  echo_note "Setting hostname to ${FQDN}..."
-  sudo hostnamectl set-hostname "$FQDN"
-
-  # update /etc/hosts safely (with sudo)
-  if grep -qE '^[[:space:]]*127\.0\.1\.1[[:space:]]+' /etc/hosts; then
-    sudo sed -i -E "s|^[[:space:]]*127\.0\.1\.1[[:space:]].*$|127.0.1.1\t${FQDN} ${HN}|g" /etc/hosts
-  else
-    printf "127.0.1.1\t%s %s\n" "$FQDN" "$HN" | sudo tee -a /etc/hosts >/dev/null
+  local short_name="${1:-}"
+  local domain_name="${2:-}"
+  if [[ -z "$short_name" ]]; then
+    read -r -p "Enter short hostname: " short_name
+  fi
+  if [[ -z "$domain_name" ]]; then
+    read -r -p "Enter domain (optional): " domain_name
   fi
 
-  echo_success "Hostname configured: ${FQDN}"
+  if ! validate_hostname "$short_name"; then
+    error "Invalid hostname: $short_name"
+    return 1
+  fi
+  if ! validate_domain "$domain_name"; then
+    error "Invalid domain: $domain_name"
+    return 1
+  fi
+
+  local fqdn="$short_name"
+  if [[ -n "$domain_name" ]]; then
+    fqdn="$short_name.$domain_name"
+  fi
+
+  hostnamectl set-hostname "$fqdn"
+  backup_file /etc/hosts
+  replace_or_add_key_value /etc/hosts "127.0.1.1" "$fqdn $short_name"
+  success "Hostname configured to $fqdn"
 }
+
 main "$@"

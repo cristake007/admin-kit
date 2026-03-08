@@ -1,46 +1,44 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+# Purpose: Install MySQL-compatible server package.
+# Supports: debian, rhel, suse
+# Requires: root privileges
+# Safe to rerun: yes
+# Side effects: package install and service enablement
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck disable=SC1091
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-
-need_sudo || exit 1
-
-MYSQL_LIST="/etc/apt/sources.list.d/mysql.list"
-MYSQL_KEYRING="/usr/share/keyrings/mysql-apt.gpg"
+require_lib log
+require_lib os
+require_lib pkg
+require_lib service
+require_lib core
 
 main() {
-  echo_info "This will install Oracle MySQL Server."
-  echo_info "After installation, the MySQL service will be enabled and started."
-  echo_info "The script will first detect if MariaDB is installed, as MySQL conflicts with MariaDB."
-  echo ""
+  need_root
+  os_detect
+  os_require_supported
 
-  if ! confirm "Do you want to continue?"; then
-    echo_info "Cancelled."; exit 0
-  fi
+  local pkg_name="mysql-server"
+  local svc_name="mysql"
 
-  if apt_is_installed mysql-server || apt_is_installed mysql-community-server; then
-    echo_success "MySQL is already installed."
-    sudo systemctl enable --now mysql
-    exit 0
-  fi
+  case "$OS_FAMILY" in
+    debian) pkg_name="default-mysql-server"; svc_name="mysql" ;;
+    rhel|suse) pkg_name="mysql-server"; svc_name="mysqld" ;;
+    arch)
+      error "MySQL installer is unsupported on arch in this toolkit. Use MariaDB instead."
+      return 1
+      ;;
+    *)
+      error "Unsupported distro family for MySQL installer: $OS_FAMILY"
+      return 1
+      ;;
+  esac
 
-  if apt_is_installed mariadb-server; then
-    echo_error "MariaDB is already installed. MySQL conflicts with MariaDB."
-    exit 1
-  fi
-  
-  apt_update
-  if ! apt_install mysql-server; then
-    add_mysql_repo
-    apt_update
-    apt_install mysql-server
-  fi
-
-  sudo systemctl enable --now mysql
-  echo_success "MySQL installed and started."
+  pkg_update_index
+  pkg_install "$pkg_name"
+  service_enable_now "$svc_name"
+  success "MySQL installation completed."
 }
 
-main
+main "$@"

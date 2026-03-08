@@ -1,34 +1,34 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+# Purpose: Install PostgreSQL server.
+# Supports: debian, rhel, suse, arch
+# Requires: root privileges
+# Safe to rerun: yes
+# Side effects: package install and service enablement
 
 THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck disable=SC1091
 source "$THIS_DIR/../bootstrap.sh"
-require "functions/functions.sh"
-
-need_sudo || exit 1
+require_lib log
+require_lib os
+require_lib pkg
+require_lib service
+require_lib core
 
 main() {
-  echo_info "This will install PostgreSQL (Debian 12 default)."
-  echo_info "After installation, the PostgreSQL service will be enabled and started."
+  need_root
+  os_detect
+  os_require_supported
 
-  if ! confirm "Do you want to continue?"; then
-    echo_info "Cancelled."; exit 0
+  local pkg_name="postgresql"
+  local svc_name="postgresql"
+  if [[ "$OS_FAMILY" == "rhel" ]]; then
+    svc_name="postgresql"
   fi
 
-  if apt_is_installed postgresql; then
-    echo_success "PostgreSQL is already installed."
-    sudo systemctl enable --now postgresql
-    pg_config --version
-    exit 0
-  fi
-
-  apt_update
-  apt_install postgresql postgresql-client
-  sudo systemctl enable --now postgresql
-  echo_success "PostgreSQL installed and started."
-  echo_info "Status: $(systemctl is-active postgresql) | Enabled: $(systemctl is-enabled postgresql 2>/dev/null || echo unknown)"
-  pg_config --version
+  pkg_update_index
+  pkg_install "$pkg_name"
+  service_enable_now "$svc_name"
+  success "PostgreSQL installation completed."
 }
 
-main
+main "$@"
