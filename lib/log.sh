@@ -9,8 +9,9 @@ YELLOW='\033[0;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-_print() { echo -e "${2}${1}${NC}"; }
+_print() { printf "%b%s%b\n" "$2" "$1" "$NC"; }
+
 echo_success() { _print "$1" "$GREEN"; }
-echo_error() { _print "$1" "$RED"; }
-echo_info() { _print "$1" "$YELLOW"; }
-echo_note() { _print "$1" "$CYAN"; }
+echo_error()   { _print "$1" "$RED"; }
+echo_info()    { _print "$1" "$YELLOW"; }
+echo_note()    { _print "$1" "$CYAN"; }
