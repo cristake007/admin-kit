@@ -30,18 +30,20 @@ main() {
       missing+=("$pkg")
     fi
   done
-
+  
+  echo
+  
   if [[ ${#missing[@]} -eq 0 ]]; then
     echo_success "All baseline packages are already installed."
     return 0
   fi
-
+  
   echo_note "Updating package index..."
   apt_update
 
   echo_note "Installing missing packages: ${missing[*]}"
   apt_install "${missing[@]}"
-  echo ""
+  echo
   echo_success "Baseline packages installed successfully."
 }
 main "$@"
