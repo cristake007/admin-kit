@@ -17,6 +17,7 @@ main() {
   echo
 
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
+  echo
 
   local packages=(ca-certificates curl gnupg lsb-release)
   local missing=()
