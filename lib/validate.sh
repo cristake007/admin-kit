@@ -35,3 +35,30 @@ validate_timezone() {
     [[ "$tz" =~ ^[A-Za-z_]+/[A-Za-z0-9_+.-]+$ ]]
   fi
 }
+
+
+detect_server() {
+  local has_apache=1 has_nginx=1
+  if apt_package_installed apache2 || service_is_active apache2; then has_apache=0; fi
+  if apt_package_installed nginx || service_is_active nginx; then has_nginx=0; fi
+
+  if (( has_apache != 0 && has_nginx != 0 )); then
+    echo_error "No supported webserver detected. Install Apache or Nginx first."
+    return 1
+  fi
+
+  if (( has_apache == 0 && has_nginx == 0 )); then
+    while true; do
+      read -r -p "Use Certbot with which server? [a=Apache / n=Nginx]: " sel
+      case "$sel" in
+        a|A) SERVER="apache"; break ;;
+        n|N) SERVER="nginx"; break ;;
+        *) echo_error "Please choose 'a' or 'n'." ;;
+      esac
+    done
+  elif (( has_apache == 0 )); then
+    SERVER="apache"
+  else
+    SERVER="nginx"
+  fi
+}
