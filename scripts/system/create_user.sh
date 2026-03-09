@@ -32,7 +32,7 @@ main() {
     fi
 
     echo_note "Creating user '$username'..."
-    script -qec "sudo adduser \"$username\"" /dev/null
+    sudo adduser "$username"
     echo_note "Adding '$username' to 'sudo' group..."
     sudo usermod -aG sudo "$username"
     echo_success "User '$username' created and added to sudo group."
