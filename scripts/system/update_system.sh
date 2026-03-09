@@ -19,7 +19,8 @@ main() {
 
   apt_update
   echo_success "Package lists updated."
-
+  echo
+  
   if confirm "Upgrade packages now?"; then
     echo_info "Upgrading packages (dist-upgrade)..."
     apt_upgrade
