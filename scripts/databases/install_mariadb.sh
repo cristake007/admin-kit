@@ -19,11 +19,19 @@ main() {
 
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
+  echo
+
   if apt_package_installed mariadb-server; then
     echo_success "MariaDB is already installed."
-    service_enable_now mariadb
-    service_status_line mariadb
-    exit 0
+    if service_is_active mariadb; then
+      echo_info "MariaDB service is running."
+      exit 0
+    else
+      echo_info "Enabling MariaDB service..."
+      service_enable_now mariadb
+      service_status_line mariadb
+      exit 0
+    fi
   fi
 
   if apt_package_installed mysql-server || apt_package_installed mysql-community-server; then
