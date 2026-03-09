@@ -21,7 +21,8 @@ main() {
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
 
   detect_server || exit 1
-  echo_info "Using web server: ${SERVER}"
+  echo_info "Webserver detected: ${SERVER}"
+  echo
 
   if apt_package_installed certbot; then
     echo_info "Certbot is already installed."
