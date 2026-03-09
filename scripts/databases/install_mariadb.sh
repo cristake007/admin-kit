@@ -43,9 +43,15 @@ main() {
   apt_update
   apt_install mariadb-server mariadb-client
   service_enable_now mariadb
-  confirm "Do you want to run 'mysql_secure_installation' to secure your MariaDB installation?" || { echo_info "Cancelled."; exit 0; }  
-  echo_info "Securing MariaDB installation..."
-  sudo mysql_secure_installation
+  echo
+  if confirm "Do you want to run 'mysql_secure_installation' to secure your MariaDB installation now?"; then
+    echo
+    echo_info "Running 'mysql_secure_installation'..."
+    sudo mysql_secure_installation
+  else
+    echo_info "You can run 'mysql_secure_installation' later to secure your MariaDB installation."
+  fi 
+  echo
   echo_success "MariaDB installed and started."
   service_status_line mariadb
 }
