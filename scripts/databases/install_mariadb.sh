@@ -24,6 +24,7 @@ main() {
   if apt_package_installed mariadb-server; then
     echo_success "MariaDB is already installed."
     if service_is_active mariadb; then
+      echo
       echo_info "MariaDB service is running."
       exit 0
     else
@@ -42,6 +43,7 @@ main() {
   apt_update
   apt_install mariadb-server mariadb-client
   service_enable_now mariadb
+  confirm "Do you want to run 'mysql_secure_installation' to secure your MariaDB installation?" || { echo_info "Cancelled."; exit 0; }  
   echo_info "Securing MariaDB installation..."
   sudo mysql_secure_installation
   echo_success "MariaDB installed and started."
