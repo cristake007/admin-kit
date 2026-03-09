@@ -30,7 +30,7 @@ install_items() {
 # Strict Debian package-state check (dpkg only)
 apt_package_installed() {
   local package_name="$1"
-  dpkg -s "$package_name" >/dev/null 2>&1
+  dpkg-query -W -f='${Status}\n' "$package_name" 2>/dev/null | grep -qx 'install ok installed'
 }
 
 # Broad installed-item check (any supported install path/source)
