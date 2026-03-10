@@ -25,6 +25,9 @@ main() {
     echo_info "Upgrading packages (dist-upgrade)..."
     apt_upgrade
     echo_success "Upgrade completed."
+    if [[ -f /var/run/reboot-required ]]; then
+      echo_note "A reboot is required to complete the upgrade."
+    fi
   else
     echo_info "Upgrade skipped."
   fi
