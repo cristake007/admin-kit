@@ -19,7 +19,7 @@ main() {
   confirm "Do you want to continue?" || { echo_info "Cancelled."; exit 0; }
   echo
 
-  local packages=(curl wget git unzip zip ca-certificates curl gnupg lsb-release)
+  local packages=(curl wget git unzip zip ca-certificates gnupg lsb-release)
   local missing=()
   local pkg
 
