@@ -26,10 +26,14 @@ main() {
       continue
     fi
 
-    if user_exists "$username"; then
-      echo_info "User '$username' already exists."
-      break
-    fi
+  if user_exists "$username"; then
+    echo_info "User '$username' already exists."
+    confirm "Add '$username' to sudo group anyway?" && {
+      sudo usermod -aG sudo "$username"
+      echo_success "User '$username' added to sudo group."
+    }
+    break
+  fi
 
     echo_note "Creating user '$username'..."
     sudo adduser "$username"
