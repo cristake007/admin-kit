@@ -26,11 +26,11 @@ main() {
     if service_is_active mariadb; then
       echo
       echo_info "MariaDB service is running."
+      service_status_line mariadb
       exit 0
     else
       echo_info "Enabling MariaDB service..."
       service_enable_now mariadb
-      service_status_line mariadb
       exit 0
     fi
   fi
