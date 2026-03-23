@@ -20,7 +20,9 @@ run() {
 
   local log="/tmp/$(basename "$target").$(date +%s).log"
 
-  if ! bash "$target" "$@" > >(tee "$log") 2> >(tee -a "$log" >&2); then
+  if bash "$target" "$@" > >(tee "$log") 2> >(tee -a "$log" >&2); then
+    return 0
+  else
     local rc=$?
     echo_error "$(basename "$target") failed (exit $rc)"
     echo_error "Called from ${caller_src}:${caller_line}"
