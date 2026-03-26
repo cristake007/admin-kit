@@ -7,11 +7,22 @@ trap err_trap ERR
 need_sudo || exit 1
 
 METHOD="apt"
-check_installed(){ item_is_installed composer; }
+
+composer_healthy() {
+  command_exists composer || return 1
+  COMPOSER_ALLOW_SUPERUSER=1 composer --version >/dev/null 2>&1
+}
+
+check_installed(){ composer_healthy; }
 check_conflicts(){ return 0; }
 install_step(){
   if [[ "$METHOD" == "apt" ]]; then
-    apt_update; apt_install composer
+    apt_update
+    if apt_package_installed composer && ! composer_healthy; then
+      sudo apt-get install --reinstall -y composer php-composer-pcre
+    else
+      apt_install composer php-composer-pcre
+    fi
   else
     command_exists php || { apt_update; apt_install php-cli; }
     command_exists curl || { apt_update; apt_install curl; }
@@ -24,15 +35,25 @@ install_step(){
     rm -f composer-setup.php
     chmod +x /usr/local/bin/composer || true
   fi
+  composer_healthy || { echo_error "Composer installation completed but command health check failed."; return 1; }
   wf_mark_changed "Installed Composer via ${METHOD}"
 }
-summary_step(){ wf_default_summary "$1" "$2"; COMPOSER_ALLOW_SUPERUSER=1 composer --version 2>/dev/null | sed '/^Deprecated:/d' || true; }
+summary_step(){
+  wf_default_summary "$1" "$2"
+  if composer_healthy; then
+    COMPOSER_ALLOW_SUPERUSER=1 composer --version 2>/dev/null | sed '/^Deprecated:/d' || true
+  else
+    echo_error "Composer command is present but unhealthy."
+  fi
+}
 
 main(){
   local choice
   echo_info "Install Composer using APT (stable) or official binary (latest)."; echo_info "Enter 'q' to cancel."
   read -r -p "Choose installation method [1=APT / 2=Binary / q=Cancel]: " choice
   case "$choice" in 1|"") METHOD="apt";; 2) METHOD="binary";; [Qq]) echo_info "Composer installation cancelled."; exit 0;; *) echo_error "Invalid choice."; exit 1;; esac
-  run_install_workflow "composer" check_installed check_conflicts install_step summary_step
+  if ! run_install_workflow "composer" check_installed check_conflicts install_step summary_step; then
+    exit 1
+  fi
 }
 main "$@"
