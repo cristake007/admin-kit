@@ -71,3 +71,34 @@ command_exists() {
 user_exists() {
   id -u "$1" >/dev/null 2>&1
 }
+
+run_step() {
+  local step_name="$1"
+  local preflight_fn="$2"
+  local execute_fn="$3"
+  local verify_fn="$4"
+
+  echo_note "Step: ${step_name}"
+
+  if ! eval "$preflight_fn"; then
+    echo_error "Preflight failed for step: ${step_name}"
+    return 1
+  fi
+
+  if ! eval "$execute_fn"; then
+    echo_error "Execution failed for step: ${step_name}"
+    return 1
+  fi
+
+  if ! eval "$verify_fn"; then
+    echo_error "Verification failed for step: ${step_name}"
+    return 1
+  fi
+
+  echo_success "Completed step: ${step_name}"
+  return 0
+}
+
+always_ok() {
+  return 0
+}
