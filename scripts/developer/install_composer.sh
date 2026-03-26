@@ -13,7 +13,7 @@ need_sudo || exit 1
 
 install_via_apt() {
   apt_update
-  if dpkg -s composer >/dev/null 2>&1; then
+  if apt_package_installed composer; then
     echo_success "Composer is already installed via APT."
   else
     apt_install composer
@@ -52,19 +52,29 @@ install_via_binary() {
 main() {
   local choice
   echo_info "Install Composer using APT (stable) or official binary (latest)."
-  read -r -p "Choose installation method [1=APT / 2=Binary]: " choice
 
-  case "$choice" in
-    1) install_via_apt ;;
-    2) install_via_binary ;;
-    *) echo_error "Invalid choice"; exit 1 ;;
-  esac
+  while true; do
+    read -r -p "Choose installation method [1=APT / 2=Binary]: " choice
+    case "$choice" in
+      1) install_via_apt; break ;;
+      2) install_via_binary; break ;;
+      *)
+        echo_error "Invalid choice. Please enter 1 (APT) or 2 (Binary)."
+        ;;
+    esac
+  done
 
   echo_note "Composer version:"
-  if id -u www-data >/dev/null 2>&1; then
-    sudo -u www-data composer --version 2>/dev/null || composer --version 2>/dev/null || true
+  if command_exists composer; then
+    if id -u www-data >/dev/null 2>&1; then
+      sudo -u www-data composer --version 2>/dev/null || composer --version 2>/dev/null || true
+    else
+      composer --version 2>/dev/null || true
+    fi
+    echo_success "Composer is ready to use."
   else
-    composer --version 2>/dev/null || true
+    echo_error "Composer command not found after installation."
+    exit 1
   fi
 }
 
