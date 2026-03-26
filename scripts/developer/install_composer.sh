@@ -51,7 +51,12 @@ main(){
   local choice
   echo_info "Install Composer using APT (stable) or official binary (latest)."; echo_info "Enter 'q' to cancel."
   read -r -p "Choose installation method [1=APT / 2=Binary / q=Cancel]: " choice
-  case "$choice" in 1|"") METHOD="apt";; 2) METHOD="binary";; [Qq]) echo_info "Composer installation cancelled."; exit 0;; *) echo_error "Invalid choice."; exit 1;; esac
+  case "$choice" in
+    1) METHOD="apt" ;;
+    2) METHOD="binary" ;;
+    [Qq]) echo_info "Composer installation cancelled."; exit 0 ;;
+    *) echo_error "Invalid choice. Enter 1, 2, or q."; exit 1 ;;
+  esac
   if ! run_install_workflow "composer" check_installed check_conflicts install_step summary_step; then
     exit 1
   fi
