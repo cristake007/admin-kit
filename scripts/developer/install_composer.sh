@@ -50,27 +50,53 @@ install_via_binary() {
 }
 
 main() {
-  local choice
+  local choice attempts max_attempts
+  attempts=0
+  max_attempts=5
+
   echo_info "Install Composer using APT (stable) or official binary (latest)."
+  echo_info "Enter 'q' to cancel."
 
   while true; do
-    read -r -p "Choose installation method [1=APT / 2=Binary]: " choice
+    read -r -p "Choose installation method [1=APT / 2=Binary / q=Cancel]: " choice
     case "$choice" in
       1) install_via_apt; break ;;
       2) install_via_binary; break ;;
+      [Qq]) echo_info "Composer installation cancelled."; exit 0 ;;
       *)
+        attempts=$((attempts + 1))
         echo_error "Invalid choice. Please enter 1 (APT) or 2 (Binary)."
+        if (( attempts >= max_attempts )); then
+          echo_error "Too many invalid attempts. Cancelling Composer installation."
+          exit 1
+        fi
         ;;
     esac
   done
 
   echo_note "Composer version:"
   if command_exists composer; then
+    local composer_version_output composer_rc
+    composer_version_output="$(
+      COMPOSER_ALLOW_SUPERUSER=1 composer --version 2>&1 | sed '/^Deprecated:/d'
+    )"
+    composer_rc=$?
+
     if id -u www-data >/dev/null 2>&1; then
-      sudo -u www-data composer --version 2>/dev/null || composer --version 2>/dev/null || true
-    else
-      composer --version 2>/dev/null || true
+      composer_version_output="$(
+        sudo -u www-data COMPOSER_ALLOW_SUPERUSER=1 composer --version 2>&1 | sed '/^Deprecated:/d'
+      )"
+      composer_rc=$?
+      if (( composer_rc != 0 )); then
+        composer_version_output="$(
+          COMPOSER_ALLOW_SUPERUSER=1 composer --version 2>&1 | sed '/^Deprecated:/d'
+        )"
+        composer_rc=$?
+      fi
     fi
+
+    [[ -n "$composer_version_output" ]] && echo "$composer_version_output"
+    (( composer_rc == 0 )) || { echo_error "Composer command exists but version check failed."; exit 1; }
     echo_success "Composer is ready to use."
   else
     echo_error "Composer command not found after installation."
