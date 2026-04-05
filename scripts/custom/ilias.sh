@@ -26,7 +26,7 @@ main() {
   confirm "Basic system setup complete. Continue with ILIAS requirements?" || { echo_info "Cancelled."; exit 0; }
 
   run "scripts/custom/create_directories.sh"
-  run "scripts/helper/install_common_tools.sh"
+  run "scripts/system/common_packages.sh"
   run "scripts/webserver/apache2.sh"
   run "scripts/developer/install_php.sh"
   run "scripts/databases/install_mariadb.sh"

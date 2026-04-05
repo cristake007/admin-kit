@@ -22,6 +22,7 @@ install_via_apt() {
 }
 
 install_via_binary() {
+  local tmp_phar
   command_exists php || { apt_update; apt_install php-cli; }
   command_exists curl || { apt_update; apt_install curl; }
 
@@ -41,11 +42,13 @@ install_via_binary() {
     return 1
   fi
 
-  php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+  tmp_phar="$(mktemp /tmp/composer.phar.XXXXXX)"
+  php composer-setup.php --install-dir=/tmp --filename="$(basename "$tmp_phar")"
   rc=$?
   rm -f composer-setup.php
-  (( rc == 0 )) || return "$rc"
-  chmod +x /usr/local/bin/composer || true
+  (( rc == 0 )) || { rm -f "$tmp_phar"; return "$rc"; }
+  sudo install -m 0755 "$tmp_phar" /usr/local/bin/composer
+  rm -f "$tmp_phar"
   echo_success "Composer installed (binary)."
 }
 
@@ -53,6 +56,7 @@ main() {
   local choice
   echo_info "Install Composer using APT (stable) or official binary (latest)."
   read -r -p "Choose installation method [1=APT / 2=Binary]: " choice
+  choice="${choice:-1}"
 
   case "$choice" in
     1) install_via_apt ;;

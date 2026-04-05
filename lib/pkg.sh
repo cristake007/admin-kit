@@ -5,16 +5,33 @@ __LIB_PKG_SH=1
 
 export DEBIAN_FRONTEND=noninteractive
 
-apt_update() { sudo apt-get update -y; }
+ensure_apt_supported() {
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo_error "apt-get not found. This admin-kit currently supports Debian/Ubuntu systems only."
+    return 1
+  fi
+}
+
+apt_update() {
+  ensure_apt_supported || return 1
+  sudo apt-get update
+}
 
 apt_upgrade() {
+  ensure_apt_supported || return 1
   sudo apt-get -o Dpkg::Options::="--force-confdef" \
                -o Dpkg::Options::="--force-confold" \
                dist-upgrade -y
 }
 
-apt_install() { sudo apt-get install -y "$@"; }
-apt_remove() { sudo apt-get remove -y "$@"; }
+apt_install() {
+  ensure_apt_supported || return 1
+  sudo apt-get install -y "$@"
+}
+apt_remove() {
+  ensure_apt_supported || return 1
+  sudo apt-get remove -y "$@"
+}
 
 install_items() {
   local kind="${1:-package}"
@@ -29,6 +46,7 @@ install_items() {
 
 # Strict Debian package-state check (dpkg only)
 apt_package_installed() {
+  ensure_apt_supported || return 1
   local package_name="$1"
   dpkg-query -W -f='${Status}\n' "$package_name" 2>/dev/null | grep -qx 'install ok installed'
 }
@@ -67,8 +85,11 @@ item_is_installed() {
 add_mysql_repo() {
   local list_file="/etc/apt/sources.list.d/mysql.list"
   local keyring_file="/usr/share/keyrings/mysql-apt.gpg"
+  local codename
+  codename="$(. /etc/os-release && echo "${VERSION_CODENAME:-}")"
+  [[ -n "$codename" ]] || { echo_error "Could not detect Debian codename."; return 1; }
   echo_note "Adding Oracle MySQL APT repository (8.4 LTS)..."
   curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 | sudo gpg --dearmor -o "$keyring_file"
-  echo "deb [signed-by=$keyring_file] http://repo.mysql.com/apt/debian/ bookworm mysql-8.4-lts mysql-tools" \
+  echo "deb [signed-by=$keyring_file] http://repo.mysql.com/apt/debian/ ${codename} mysql-8.4-lts mysql-tools" \
     | sudo tee "$list_file" >/dev/null
 }
