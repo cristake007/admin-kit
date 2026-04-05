@@ -54,6 +54,11 @@ save_env_var() {
   while [[ $# -gt 0 ]]; do
     local var_name="$1"
     shift
+    if [[ ! "$var_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      echo_error "Invalid variable name: '$var_name'"
+      rm -f "$tmp"
+      return 1
+    fi
     local var_value
     eval "var_value=\${$var_name-}"
     if [[ -z "$var_value" ]]; then

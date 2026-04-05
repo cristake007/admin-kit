@@ -62,9 +62,15 @@ main() {
       apt_install "php${php_version}" "php${php_version}-cli" "php${php_version}-common" \
                   "php${php_version}-mysql" "php${php_version}-xml" "php${php_version}-curl" \
                   "php${php_version}-zip" "php${php_version}-gd" "php${php_version}-mbstring"
-      update-alternatives --config php
     else
       apt_install "php${php_version}"
+    fi
+
+    if command -v update-alternatives >/dev/null 2>&1; then
+      local php_bin="/usr/bin/php${php_version}"
+      if [[ -x "$php_bin" ]]; then
+        sudo update-alternatives --set php "$php_bin" || true
+      fi
     fi
   fi
 

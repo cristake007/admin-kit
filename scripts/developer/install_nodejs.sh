@@ -16,6 +16,10 @@ main() {
   echo_info "This installs Node.js from NodeSource."
   read -r -p "Enter Node.js version (e.g., 18, 20) [20]: " node_version
   node_version="${node_version:-20}"
+  if ! [[ "$node_version" =~ ^[0-9]+$ ]]; then
+    echo_error "Invalid Node.js major version: $node_version"
+    exit 1
+  fi
 
   confirm "Continue with Node.js ${node_version}.x installation?" || { echo_info "Cancelled."; exit 0; }
 

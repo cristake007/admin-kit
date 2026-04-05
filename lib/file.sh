@@ -56,8 +56,7 @@ clean_and_create_directory() {
 
   if [[ -d "$dir" ]] && directory_has_content "$dir"; then
     echo_info "Directory exists and has content: $description ($dir)"
-    sudo chown -R www-data:www-data "$dir"
-    sudo chmod -R 775 "$dir"
+    echo_info "Keeping existing ownership/permissions for safety."
     return 0
   fi
 

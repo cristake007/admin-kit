@@ -15,6 +15,7 @@ DROPIN="$SSHD_DIR/99-admin-kit.conf"
 BACKUP="$SSHD_CFG.admin-kit.bak"
 
 main() {
+  local sshd_test_err
   echo_info "This disables SSH root login by writing: $DROPIN"
   echo_info "It also creates a one-time backup: $BACKUP"
   echo_info "Make sure you have a sudo-capable non-root user first."
@@ -50,13 +51,14 @@ PermitRootLogin no
 CONF
   sudo chmod 0644 "$DROPIN"
 
-  if ! sudo sshd -t 2>/tmp/sshd_test.err; then
+  sshd_test_err="$(mktemp /tmp/sshd_test.err.XXXXXX)"
+  if ! sudo sshd -t 2>"$sshd_test_err"; then
     echo_error "sshd config test failed:"
-    cat /tmp/sshd_test.err >&2 || true
-    sudo rm -f /tmp/sshd_test.err "$DROPIN" || true
+    cat "$sshd_test_err" >&2 || true
+    sudo rm -f "$sshd_test_err" "$DROPIN" || true
     exit 1
   fi
-  rm -f /tmp/sshd_test.err || true
+  rm -f "$sshd_test_err" || true
 
   service_reload_or_restart ssh || service_reload_or_restart sshd
   echo_success "Root SSH login disabled via $DROPIN."
